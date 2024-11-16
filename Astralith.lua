@@ -9,12 +9,45 @@ local guildMembers = {} -- Table pour stocker les informations des membres de la
 local HBD = LibStub("HereBeDragons-2.0")
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
+
 -- Intervalle de mise à jour
 local updateInterval = 2 -- En secondes
 local movementThreshold = 0.005 -- 5% de la carte (environ 5 mètres)
 local timeSinceLastUpdate = 0
+local maxTimeBetweenUpdate = 30 -- En secondes
 local lastSentPosition = { x = nil, y = nil, mapID = nil } -- Dernière position envoyée
 
+function Astralith:GetClassIcon()
+    local _, class = UnitClass("player")
+    if class == "DRUID" then
+        return "Interface\\AddOns\\Astralith\\Textures\\DRUID"
+
+    elseif class == "HUNTER" then
+        return "Interface\\AddOns\\Astralith\\Textures\\HUNTER"
+        
+    elseif class == "MAGE" then 
+        return "Interface\\AddOns\\Astralith\\Textures\\MAGE"
+
+    elseif class == "PALADIN" then
+        return "Interface\\AddOns\\Astralith\\Textures\\PALADIN"
+
+    elseif class == "PRIEST" then
+        return "Interface\\AddOns\\Astralith\\Textures\\PRIEST"
+
+    elseif class == "ROGUE" then
+        return "Interface\\AddOns\\Astralith\\Textures\\ROGUE"
+
+    elseif class == "SHAMAN" then
+        return "Interface\\AddOns\\Astralith\\Textures\\SHAMAN"
+
+    elseif class == "WARLOCK" then
+        return "Interface\\AddOns\\Astralith\\Textures\\WARLOCK"
+
+    elseif class == "WARRIOR" then
+        return "Interface\\AddOns\\Astralith\\Textures\\WARRIOR"
+    end
+end
+local selectedTexture = Astralith:GetClassIcon()
 -- Fonction pour calculer la distance entre deux points
 local function CalculateDistance(x1, y1, x2, y2)
     if not x1 or not y1 or not x2 or not y2 then return math.huge end
@@ -23,6 +56,22 @@ end
 
 -- Préfixe unique pour l'addon
 local ADDON_PREFIX = "Astralith"
+local rank
+if rank == nil then
+    -- Parcours des membres de la guilde pour trouver le rang
+    for i = 1, GetNumGuildMembers() do
+        local memberName, memberRank = GetGuildRosterInfo(i)
+        local playerName = UnitName("player")
+        local realmName = GetNormalizedRealmName()
+        local fullPlayerName = playerName .. "-" .. realmName
+        print(fullPlayerName, memberName, memberRank)
+
+        if memberName == fullPlayerName then
+            rank = memberRank
+            break
+        end
+    end
+end
 
 -- Inscription du préfixe pour la communication addon
 C_ChatInfo.RegisterAddonMessagePrefix(ADDON_PREFIX)
@@ -38,25 +87,16 @@ function Astralith:SendGuildPosition()
             local x, y = position:GetXY()
             if x and y then
                 -- Vérifie si la position a changé significativement
-                if CalculateDistance(x, y, lastSentPosition.x, lastSentPosition.y) > movementThreshold then
+                if CalculateDistance(x, y, lastSentPosition.x, lastSentPosition.y) > movementThreshold
+                or timeSinceLastUpdate > maxTimeBetweenUpdate then
                     local name = UnitName("player")
                     local level = UnitLevel("player")
                     local class = UnitClass("player")
-                    local rank = "Membre"
-
-                    -- Parcours des membres de la guilde pour trouver le rang
-                    for i = 1, GetNumGuildMembers() do
-                        local memberName, memberRank = GetGuildRosterInfo(i)
-                        if memberName and memberName == name then
-                            rank = memberRank
-                            break
-                        end
-                    end
-
-                    local icon = "Interface\\AddOns\\Astralith\\Textures\\ClassIcon_paladin"
+                    local icon = selectedTexture
                     local message = string.format("%s,%s,%d,%s,%.3f,%.3f,%d,%s", name, rank, level, class, x, y, mapID, icon)
                     C_ChatInfo.SendAddonMessage(ADDON_PREFIX, message, "GUILD")
                     lastSentPosition = { x = x, y = y, mapID = mapID }
+                    timeSinceLastUpdate = 0
                 end
             end
         end
@@ -75,7 +115,7 @@ end
 local function OnAddonMessage(prefix, text, channel, sender)
     if prefix == ADDON_PREFIX and not IsSelf(sender) then
         local name, rank, level, class, x, y, mapID, icon = strsplit(",", text)
-        --print("Update ", name, " ", rank, " ", level, " ", class, " ", x, " ", y, " ", mapID, " ", icon)
+        print("Update ", name, " ", rank, " ", level, " ", class, " ", x, " ", y, " ", mapID, " ", icon)
         x, y, mapID, level = tonumber(x), tonumber(y), tonumber(mapID), tonumber(level)
 
         if x and y and mapID then
@@ -88,7 +128,8 @@ local function OnAddonMessage(prefix, text, channel, sender)
                 mapID = mapID,
                 icon = icon,
             }
-            Astralith:CreateGuildMemberPin(name)
+
+            Astralith:CreateGuildMemberPin(name, icon)
         end
     end
 end
@@ -108,23 +149,22 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 -- Mise à jour périodique pour envoyer la position
-local updateFrame = CreateFrame("Frame")
-updateFrame:SetScript("OnUpdate", function(self, elapsed)
-    timeSinceLastUpdate = timeSinceLastUpdate + elapsed
-    if timeSinceLastUpdate >= updateInterval then
-        Astralith:SendGuildPosition()
-        timeSinceLastUpdate = 0
-    end
-end)
+-- local updateFrame = CreateFrame("Frame")
+-- updateFrame:SetScript("OnUpdate", function(self, elapsed)
+--     timeSinceLastUpdate = timeSinceLastUpdate + elapsed
+--     if timeSinceLastUpdate >= updateInterval then
+--         Astralith:SendGuildPosition()
+--         timeSinceLastUpdate = 0
+--     end
+-- end)
 
 -- Fonction pour créer ou mettre à jour un pin pour un membre de la guilde
-function Astralith:CreateGuildMemberPin(memberName)
+function Astralith:CreateGuildMemberPin(memberName, icon)
     local member = guildMembers[memberName]
     if not member then return end
-
-    Astralith:RemovePinsByTitle(memberName)
-
-    self:AddWaypoint(member.mapID, member.x, member.y, memberName)
+    print("XXXXXXXXXXXXX ", icon)
+    Astralith:RemovePinsByTitle(memberName, icon)
+    self:AddWaypoint(member.mapID, member.x, member.y, memberName, icon)
 end
 
 -- Fonction pour rafraîchir les pins dynamiquement
@@ -154,12 +194,11 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     timeSinceLastUpdate = timeSinceLastUpdate + elapsed
     if timeSinceLastUpdate >= updateInterval then
         Astralith:SendGuildPosition()
-        timeSinceLastUpdate = 0
     end
 end)
 
 -- Fonction pour créer deux pins (carte et mini-carte)
-function Astralith:CreateMapPin(waypoint)
+function Astralith:CreateMapPin(waypoint, icon)
     -- Supprime les anciens pins s'ils existent
     if pins[waypoint] then
         if pins[waypoint].world then
@@ -177,7 +216,7 @@ function Astralith:CreateMapPin(waypoint)
 
     local worldTexture = worldPin:CreateTexture(nil, "OVERLAY")
     worldTexture:SetAllPoints()
-    worldTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\ClassIcon_paladin") -- Chemin vers une icône personnalisée
+    worldTexture:SetTexture(icon) -- Chemin vers une icône personnalisée
     worldPin.texture = worldTexture
 
     local worldAdded = HBDPins:AddWorldMapIconMap("Astralith", worldPin, waypoint.mapID, waypoint.x, waypoint.y, HBD_PINS_WORLDMAP_SHOW_WORLD) -- HBD_PINS_WORLDMAP_SHOW_PARENT si uniquement locale
@@ -188,7 +227,7 @@ function Astralith:CreateMapPin(waypoint)
 
     local minimapTexture = minimapPin:CreateTexture(nil, "OVERLAY")
     minimapTexture:SetAllPoints()
-    minimapTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\ClassIcon_paladin") -- Chemin vers une icône personnalisée
+    minimapTexture:SetTexture(icon) -- Chemin vers une icône personnalisée
     minimapPin.texture = minimapTexture
 
     local minimapAdded = HBDPins:AddMinimapIconMap("Astralith", minimapPin, waypoint.mapID, waypoint.x, waypoint.y, false)
@@ -222,7 +261,7 @@ function Astralith:CreateMapPin(waypoint)
 end
 
 -- Fonction pour ajouter un waypoint
-function Astralith:AddWaypoint(mapID, x, y, title)
+function Astralith:AddWaypoint(mapID, x, y, title, icon)
     local waypoint = {
         mapID = mapID,
         x = x,
@@ -230,9 +269,8 @@ function Astralith:AddWaypoint(mapID, x, y, title)
         title = title or "Waypoint",
     }
     table.insert(waypoints, waypoint)
-
     -- Ajout du pin via HereBeDragons
-    self:CreateMapPin(waypoint)
+    self:CreateMapPin(waypoint, icon)
 end
 
 -- Fonction pour supprimer tous les waypoints
@@ -306,6 +344,7 @@ end
 ---------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------
 -- Ajouter le bouton sur la minimap
+local isConfigWindowShown = false
 function Astralith:CreateMinimapButton()
     local minimapButton = CreateFrame("Button", "AstralithMinimapButton", Minimap)
     minimapButton:SetSize(32, 32)
@@ -390,9 +429,26 @@ function Astralith:ShowTextureSelector()
     scrollFrame:SetScrollChild(content)
 
     local textures = {
-        "Interface\\AddOns\\Astralith\\Textures\\ClassIcon_paladin",
-        "Interface\\AddOns\\Astralith\\Textures\\ClassIcon_mage",
-        "Interface\\AddOns\\Astralith\\Textures\\ClassIcon_warrior",
+        "Interface\\AddOns\\Astralith\\Textures\\Pin",
+        "Interface\\AddOns\\Astralith\\Textures\\DRUID",
+        "Interface\\AddOns\\Astralith\\Textures\\HUNTER",
+        "Interface\\AddOns\\Astralith\\Textures\\MAGE",
+        "Interface\\AddOns\\Astralith\\Textures\\PALADIN",
+        "Interface\\AddOns\\Astralith\\Textures\\PRIEST",
+        "Interface\\AddOns\\Astralith\\Textures\\ROGUE",
+        "Interface\\AddOns\\Astralith\\Textures\\SHAMAN",
+        "Interface\\AddOns\\Astralith\\Textures\\WARLOCK",
+        "Interface\\AddOns\\Astralith\\Textures\\WARRIOR",
+        "Interface\\AddOns\\Astralith\\Textures\\DRUID2",
+        "Interface\\AddOns\\Astralith\\Textures\\HUNTER2",
+        "Interface\\AddOns\\Astralith\\Textures\\MAGE2",
+        "Interface\\AddOns\\Astralith\\Textures\\PALADIN2",
+        "Interface\\AddOns\\Astralith\\Textures\\PRIEST2",
+        "Interface\\AddOns\\Astralith\\Textures\\ROGUE2",
+        "Interface\\AddOns\\Astralith\\Textures\\SHAMAN2",
+        "Interface\\AddOns\\Astralith\\Textures\\WARLOCK2",
+        "Interface\\AddOns\\Astralith\\Textures\\WARRIOR2",
+        "Interface\\AddOns\\Astralith\\Textures\\DEATHKNIGHT",
         -- Ajoutez d'autres textures ici
     }
 
@@ -428,9 +484,7 @@ end
 
 -- Envoyer la texture sélectionnée à la guilde
 function Astralith:SendSelectedTexture(texturePath)
-    local name = UnitName("player")
-    local message = string.format("SET_TEXTURE,%s,%s", name, texturePath)
-    C_ChatInfo.SendAddonMessage(ADDON_PREFIX, message, "GUILD")
+    selectedTexture = texturePath
 end
 
 -- Traitement des messages reçus pour changer la texture
