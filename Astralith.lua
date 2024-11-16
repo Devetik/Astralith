@@ -211,16 +211,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
--- Mise à jour périodique pour envoyer la position
--- local updateFrame = CreateFrame("Frame")
--- updateFrame:SetScript("OnUpdate", function(self, elapsed)
---     timeSinceLastUpdate = timeSinceLastUpdate + elapsed
---     if timeSinceLastUpdate >= updateInterval then
---         Astralith:SendGuildPosition()
---         timeSinceLastUpdate = 0
---     end
--- end)
-
 -- Fonction pour créer ou mettre à jour un pin pour un membre de la guilde
 function Astralith:CreateGuildMemberPin(memberName, icon, rank)
     local member = guildMembers[memberName]
@@ -411,7 +401,45 @@ function Astralith:RemovePinsByTitle(title)
     end
 end
 
+local previousRoster = {}
 
+local function UpdateGuildRoster()
+    GuildRoster() -- Demande une mise à jour du roster
+    local numGuildMembers = GetNumGuildMembers()
+    local currentRoster = {}
+
+    for i = 1, numGuildMembers do
+        local name, _, _, _, _, _, _, _, online = GetGuildRosterInfo(i)
+        if name then
+            currentRoster[name] = online
+        end
+    end
+
+    -- Comparer les états en ligne
+    for name, wasOnline in pairs(previousRoster) do
+        if wasOnline and not currentRoster[name] then
+            print("Déconnexion détectée : " .. name)
+            Astralith:RemovePinsByTitle(Ambiguate(name, "short"))
+            -- Exemple : Supprimer une pin
+            -- Astralith:RemovePinsByTitle(name)
+        end
+    end
+
+    -- Mise à jour des données du roster précédent
+    previousRoster = currentRoster
+end
+
+-- Écouter l'événement
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("GUILD_ROSTER_UPDATE")
+frame:SetScript("OnEvent", function(_, event)
+    if event == "GUILD_ROSTER_UPDATE" then
+        UpdateGuildRoster()
+    end
+end)
+
+-- Initialisation au chargement de l'addon
+GuildRoster()
 
 -- Commandes slash
 SLASH_ASTRALITH1 = "/astr"
