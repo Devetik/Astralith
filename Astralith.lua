@@ -14,7 +14,7 @@ local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 local updateInterval = 2 -- En secondes
 local movementThreshold = 0.005 -- 5% de la carte (environ 5 mètres)
 local timeSinceLastUpdate = 0
-local maxTimeBetweenUpdate = 30 -- En secondes
+local maxTimeBetweenUpdate = 3 -- En secondes
 local lastSentPosition = { x = nil, y = nil, mapID = nil } -- Dernière position envoyée
 
 function Astralith:GetClassIcon()
@@ -54,20 +54,60 @@ local function CalculateDistance(x1, y1, x2, y2)
     return math.sqrt((x2 - x1)^2 + (y2 - y1)^2)
 end
 
+local playerRank = nil -- Rang du joueur dans la guilde
+
+-- Fonction pour récupérer le rang du joueur
+local function GetPlayerGuildRankIndex()
+    local playerName = UnitName("player")
+    local realmName = GetNormalizedRealmName()
+    local fullPlayerName = playerName .. "-" .. realmName
+    local numGuildMembers = GetNumGuildMembers()
+    for i = 1, numGuildMembers do
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name and name == fullPlayerName then
+            return rankIndex
+        end
+    end
+
+    return nil -- Si le joueur n'est pas trouvé
+end
+
+-- Fonction pour initialiser le rang
+local function InitializePlayerRank()
+    playerRank = GetPlayerGuildRankIndex()
+    if playerRank then
+        return true -- Le rang a été trouvé
+    else
+        --print("Rang du joueur introuvable, tentative suivante...")
+        C_GuildInfo.GuildRoster() -- Rafraîchir les infos de guilde
+        return false -- Le rang n'est pas encore disponible
+    end
+end
+
+-- Attente jusqu'à ce que le rang soit initialisé
+local frame = CreateFrame("Frame")
+frame:SetScript("OnUpdate", function(self, elapsed)
+    if InitializePlayerRank() then
+        self:SetScript("OnUpdate", nil) -- Stoppe la boucle dès que le rang est trouvé
+    end
+end)
+
+-- Déclencher une mise à jour initiale de la guilde
+C_GuildInfo.GuildRoster()
+
 -- Préfixe unique pour l'addon
 local ADDON_PREFIX = "Astralith"
-local rank
-if rank == nil then
+
+if playerRank == nil then
     -- Parcours des membres de la guilde pour trouver le rang
     for i = 1, GetNumGuildMembers() do
         local memberName, memberRank = GetGuildRosterInfo(i)
         local playerName = UnitName("player")
         local realmName = GetNormalizedRealmName()
         local fullPlayerName = playerName .. "-" .. realmName
-        print(fullPlayerName, memberName, memberRank)
 
         if memberName == fullPlayerName then
-            rank = memberRank
+            playerRank = memberRank
             break
         end
     end
@@ -86,14 +126,36 @@ function Astralith:SendGuildPosition()
         if position then
             local x, y = position:GetXY()
             if x and y then
-                -- Vérifie si la position a changé significativement
+                -- Vérifie si le rang est défini, sinon essaie de le récupérer
+                if not playerRank then
+                    for i = 1, GetNumGuildMembers() do
+                        local memberName, memberRank = GetGuildRosterInfo(i)
+                        local playerName = UnitName("player")
+                        local realmName = GetNormalizedRealmName()
+                        local fullPlayerName = playerName .. "-" .. realmName
+
+                        if memberName == fullPlayerName then
+                            playerRank = memberRank
+                            break
+                        end
+                    end
+                end
+
+                -- Définit un rang par défaut si toujours `nil`
+                playerRank = playerRank or "Membre"
+
+                -- if timeSinceLastUpdate > maxTimeBetweenUpdate * 4 then
+                --     playerRank = GetPlayerGuildRankIndex()
+                -- end
+                -- Vérifie si la position a changé significativement ou si trop de temps s'est écoulé
                 if CalculateDistance(x, y, lastSentPosition.x, lastSentPosition.y) > movementThreshold
                 or timeSinceLastUpdate > maxTimeBetweenUpdate then
+                    playerRank = GetPlayerGuildRankIndex()
                     local name = UnitName("player")
                     local level = UnitLevel("player")
                     local class = UnitClass("player")
                     local icon = selectedTexture
-                    local message = string.format("%s,%s,%d,%s,%.3f,%.3f,%d,%s", name, rank, level, class, x, y, mapID, icon)
+                    local message = string.format("%s,%s,%d,%s,%.3f,%.3f,%d,%s", name, playerRank, level, class, x, y, mapID, icon)
                     C_ChatInfo.SendAddonMessage(ADDON_PREFIX, message, "GUILD")
                     lastSentPosition = { x = x, y = y, mapID = mapID }
                     timeSinceLastUpdate = 0
@@ -102,6 +164,7 @@ function Astralith:SendGuildPosition()
         end
     end
 end
+
 
 -- Fonction pour vérifier si le message provient du joueur lui-même
 local function IsSelf(sender)
@@ -115,7 +178,7 @@ end
 local function OnAddonMessage(prefix, text, channel, sender)
     if prefix == ADDON_PREFIX and not IsSelf(sender) then
         local name, rank, level, class, x, y, mapID, icon = strsplit(",", text)
-        print("Update ", name, " ", rank, " ", level, " ", class, " ", x, " ", y, " ", mapID, " ", icon)
+        --print("Update ", name, " ", rank, " ", level, " ", class, " ", x, " ", y, " ", mapID, " ", icon)
         x, y, mapID, level = tonumber(x), tonumber(y), tonumber(mapID), tonumber(level)
 
         if x and y and mapID then
@@ -129,7 +192,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
                 icon = icon,
             }
 
-            Astralith:CreateGuildMemberPin(name, icon)
+            Astralith:CreateGuildMemberPin(name, icon, rank)
         end
     end
 end
@@ -159,12 +222,12 @@ end)
 -- end)
 
 -- Fonction pour créer ou mettre à jour un pin pour un membre de la guilde
-function Astralith:CreateGuildMemberPin(memberName, icon)
+function Astralith:CreateGuildMemberPin(memberName, icon, rank)
     local member = guildMembers[memberName]
     if not member then return end
-    print("XXXXXXXXXXXXX ", icon)
+
     Astralith:RemovePinsByTitle(memberName, icon)
-    self:AddWaypoint(member.mapID, member.x, member.y, memberName, icon)
+    self:AddWaypoint(member.mapID, member.x, member.y, memberName, icon, rank)
 end
 
 -- Fonction pour rafraîchir les pins dynamiquement
@@ -198,7 +261,8 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 -- Fonction pour créer deux pins (carte et mini-carte)
-function Astralith:CreateMapPin(waypoint, icon)
+function Astralith:CreateMapPin(waypoint, icon, rank)
+
     -- Supprime les anciens pins s'ils existent
     if pins[waypoint] then
         if pins[waypoint].world then
@@ -212,12 +276,45 @@ function Astralith:CreateMapPin(waypoint, icon)
 
     -- Crée un pin pour la carte mondiale
     local worldPin = CreateFrame("Frame", nil, UIParent)
-    worldPin:SetSize(16, 16)
+    worldPin:SetSize(18, 18)
 
-    local worldTexture = worldPin:CreateTexture(nil, "OVERLAY")
+    local worldTexture = worldPin:CreateTexture(nil, "BACKGROUND")
     worldTexture:SetAllPoints()
-    worldTexture:SetTexture(icon) -- Chemin vers une icône personnalisée
+    worldTexture:SetSize(16,16)
+    if(rank == "5") then 
+        worldTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\poop") -- Chemin vers une icône personnalisée
+    else
+        worldTexture:SetTexture(icon)
+    end
     worldPin.texture = worldTexture
+
+    if(rank == "0") then
+        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 1)
+        overlayTexture:SetSize(36,36)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\GM")
+    
+    elseif(rank == "1") then
+        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 1)
+        overlayTexture:SetSize(36,36)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Officier")
+    elseif(rank == "2") then
+        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
+        overlayTexture:SetSize(31,31)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Veteran2")
+    elseif(rank == "3") then
+        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
+        overlayTexture:SetSize(31,31)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Member2")
+    elseif(rank == "5") then 
+        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
+        overlayTexture:SetSize(31,31)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\poop")
+    end
 
     local worldAdded = HBDPins:AddWorldMapIconMap("Astralith", worldPin, waypoint.mapID, waypoint.x, waypoint.y, HBD_PINS_WORLDMAP_SHOW_WORLD) -- HBD_PINS_WORLDMAP_SHOW_PARENT si uniquement locale
 
@@ -261,7 +358,7 @@ function Astralith:CreateMapPin(waypoint, icon)
 end
 
 -- Fonction pour ajouter un waypoint
-function Astralith:AddWaypoint(mapID, x, y, title, icon)
+function Astralith:AddWaypoint(mapID, x, y, title, icon, rank)
     local waypoint = {
         mapID = mapID,
         x = x,
@@ -270,7 +367,7 @@ function Astralith:AddWaypoint(mapID, x, y, title, icon)
     }
     table.insert(waypoints, waypoint)
     -- Ajout du pin via HereBeDragons
-    self:CreateMapPin(waypoint, icon)
+    self:CreateMapPin(waypoint, icon, rank)
 end
 
 -- Fonction pour supprimer tous les waypoints
