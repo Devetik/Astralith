@@ -271,11 +271,7 @@ function Astralith:CreateMapPin(waypoint, icon, rank)
     local worldTexture = worldPin:CreateTexture(nil, "BACKGROUND")
     worldTexture:SetAllPoints()
     worldTexture:SetSize(16,16)
-    if(rank == "5") then 
-        worldTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\poop") -- Chemin vers une icône personnalisée
-    else
-        worldTexture:SetTexture(icon)
-    end
+    worldTexture:SetTexture(icon)
     worldPin.texture = worldTexture
 
     if(rank == "0") then
@@ -286,24 +282,19 @@ function Astralith:CreateMapPin(waypoint, icon, rank)
     
     elseif(rank == "1") then
         local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
-        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 1)
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", -1.3, -0.5)
         overlayTexture:SetSize(36,36)
         overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Officier")
     elseif(rank == "2") then
         local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
-        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
-        overlayTexture:SetSize(31,31)
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(36,36)
         overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Veteran2")
     elseif(rank == "3") then
         local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
-        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
-        overlayTexture:SetSize(31,31)
+        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(36,36)
         overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Member2")
-    elseif(rank == "5") then 
-        local overlayTexture = worldPin:CreateTexture(nil, "OVERLAY")
-        overlayTexture:SetPoint("CENTER", worldPin, "CENTER", 0, 0)
-        overlayTexture:SetSize(31,31)
-        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\poop")
     end
 
     local worldAdded = HBDPins:AddWorldMapIconMap("Astralith", worldPin, waypoint.mapID, waypoint.x, waypoint.y, HBD_PINS_WORLDMAP_SHOW_WORLD) -- HBD_PINS_WORLDMAP_SHOW_PARENT si uniquement locale
@@ -312,10 +303,33 @@ function Astralith:CreateMapPin(waypoint, icon, rank)
     local minimapPin = CreateFrame("Frame", nil, UIParent)
     minimapPin:SetSize(12, 12)
 
-    local minimapTexture = minimapPin:CreateTexture(nil, "OVERLAY")
+    local minimapTexture = minimapPin:CreateTexture(nil, "BACKGROUND")
     minimapTexture:SetAllPoints()
     minimapTexture:SetTexture(icon) -- Chemin vers une icône personnalisée
     minimapPin.texture = minimapTexture
+
+    if(rank == "0") then
+        local overlayTexture = minimapPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", minimapPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(20,20)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\GM")
+    
+    elseif(rank == "1") then
+        local overlayTexture = minimapPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", minimapPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(20,20)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Officier")
+    elseif(rank == "2") then
+        local overlayTexture = minimapPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", minimapPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(20,20)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Veteran2")
+    elseif(rank == "3") then
+        local overlayTexture = minimapPin:CreateTexture(nil, "OVERLAY")
+        overlayTexture:SetPoint("CENTER", minimapPin, "CENTER", -1.3, -0.5)
+        overlayTexture:SetSize(20,20)
+        overlayTexture:SetTexture("Interface\\AddOns\\Astralith\\Textures\\Member2")
+    end
 
     local minimapAdded = HBDPins:AddMinimapIconMap("Astralith", minimapPin, waypoint.mapID, waypoint.x, waypoint.y, false)
 
