@@ -15,9 +15,16 @@ public class PlanetSaveManager : MonoBehaviour
 
     private void Awake()
     {
+        Debug.Log("=== PLANETSAVEMANAGER AWAKE ===");
+        Debug.Log($"GameObject: {gameObject.name}");
+        Debug.Log($"Active: {gameObject.activeInHierarchy}");
+        
         // Cherche les deux composants
         planetGenerator = GetComponent<PlanetGenerator>();
         planetGeneratorNetworked = GetComponent<PlanetGeneratorNetworked>();
+        
+        Debug.Log($"PlanetGenerator trouvé: {planetGenerator != null}");
+        Debug.Log($"PlanetGeneratorNetworked trouvé: {planetGeneratorNetworked != null}");
         
         if (planetGeneratorNetworked == null && planetGenerator == null)
         {
@@ -27,12 +34,15 @@ public class PlanetSaveManager : MonoBehaviour
 
         // Définit le chemin de sauvegarde dans le dossier persistant
         savePath = Path.Combine(Application.persistentDataPath, saveFileName);
+        Debug.Log($"Chemin de sauvegarde: {savePath}");
         
         // Log de debug pour voir ce qui est trouvé
         if (planetGeneratorNetworked != null)
             Debug.Log("PlanetSaveManager: PlanetGeneratorNetworked trouvé - mode réseau activé");
         if (planetGenerator != null)
             Debug.Log("PlanetSaveManager: PlanetGenerator trouvé - mode local disponible");
+            
+        Debug.Log("=== FIN PLANETSAVEMANAGER AWAKE ===");
     }
 
     private void Start()
@@ -67,6 +77,11 @@ public class PlanetSaveManager : MonoBehaviour
     /// </summary>
     public void SaveSettings()
     {
+        Debug.Log("=== DÉBUT SAUVEGARDE ===");
+        Debug.Log($"PlanetGeneratorNetworked: {planetGeneratorNetworked != null}");
+        Debug.Log($"PlanetGenerator: {planetGenerator != null}");
+        Debug.Log($"Chemin: {savePath}");
+        
         try
         {
             if (planetGeneratorNetworked != null)
@@ -77,6 +92,7 @@ public class PlanetSaveManager : MonoBehaviour
                 File.WriteAllText(savePath, json);
                 Debug.Log($"Sauvegarde des paramètres de PlanetGeneratorNetworked (seed: {planetGeneratorNetworked.seed}, resolution: {planetGeneratorNetworked.resolution})");
                 Debug.Log($"Paramètres sauvegardés dans : {savePath}");
+                Debug.Log($"Contenu JSON: {json}");
             }
             else
             {
@@ -87,7 +103,10 @@ public class PlanetSaveManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"Erreur lors de la sauvegarde : {e.Message}");
+            Debug.LogError($"Stack trace: {e.StackTrace}");
         }
+        
+        Debug.Log("=== FIN SAUVEGARDE ===");
     }
 
     /// <summary>

@@ -438,7 +438,7 @@ MonoBehaviour:
   _objectPool: {fileID: 0}
   _persistence: 0
   _logging: {fileID: 0}
-  _spawnablePrefabs: {fileID: 11400000, guid: b96fd956eaee2bf41a2a4e83c80ae0e5, type: 2}
+  _spawnablePrefabs: {fileID: 11400000, guid: 7e793b2fd17b65e4bbdd0c526bafbd94, type: 2}
 --- !u!4 &655967993
 Transform:
   m_ObjectHideFlags: 0
@@ -694,8 +694,6 @@ GameObject:
   - component: {fileID: 2087427212}
   - component: {fileID: 2087427211}
   - component: {fileID: 2087427214}
-  - component: {fileID: 2087427213}
-  - component: {fileID: 2087427217}
   - component: {fileID: 2087427220}
   - component: {fileID: 2087427219}
   - component: {fileID: 2087427221}
@@ -778,22 +776,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2087427213
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2087427210}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b54a7256ac4ea00429268906c1919dc2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  planetGenerator: {fileID: 2087427211}
-  saveManager: {fileID: 2087427214}
-  showUI: 1
-  toggleUIKey: 9
 --- !u!114 &2087427214
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -809,23 +791,6 @@ MonoBehaviour:
   saveFileName: planet_settings2.json
   autoSaveOnGenerate: 1
   autoLoadOnStart: 1
---- !u!114 &2087427217
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2087427210}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5867c962d707df24cbb71ce8d1495c81, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  setupOnStart: 1
-  planetGenerator: {fileID: 0}
-  planetGeneratorNetworked: {fileID: 0}
-  networkManager: {fileID: 0}
-  simpleUI: {fileID: 0}
 --- !u!114 &2087427219
 MonoBehaviour:
   m_ObjectHideFlags: 0

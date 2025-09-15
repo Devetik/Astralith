@@ -164,4 +164,22 @@ public class SaveTest : MonoBehaviour
         
         Debug.Log("=== FIN DU TEST AUTO-LOAD ===");
     }
+    
+    [ContextMenu("Test Sauvegarde Simple")]
+    public void TestSimpleSave()
+    {
+        Debug.Log("=== TEST SAUVEGARDE SIMPLE ===");
+        
+        var saveManager = GetComponent<PlanetSaveManager>();
+        if (saveManager == null)
+        {
+            Debug.LogError("PlanetSaveManager non trouvé !");
+            return;
+        }
+        
+        Debug.Log("PlanetSaveManager trouvé, test de sauvegarde...");
+        saveManager.SaveSettings();
+        
+        Debug.Log("=== FIN TEST SAUVEGARDE SIMPLE ===");
+    }
 }

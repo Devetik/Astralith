@@ -18,20 +18,63 @@ public class SimplePlanetUI : MonoBehaviour
     
     private void Start()
     {
+        Debug.Log("=== SIMPLEPLANETUI START ===");
+        
+        // Délai pour laisser le temps aux autres composants de s'initialiser
+        StartCoroutine(DelayedComponentSearch());
+    }
+    
+    private System.Collections.IEnumerator DelayedComponentSearch()
+    {
+        // Attendre 2 secondes pour laisser le temps aux composants de s'initialiser
+        yield return new WaitForSeconds(2.0f);
+        
+        Debug.Log("=== RECHERCHE DIFFÉRÉE DES COMPOSANTS ===");
+        
         // Trouve automatiquement les composants si non assignés
         if (planetGenerator == null)
+        {
             planetGenerator = FindObjectOfType<PlanetGenerator>();
+            Debug.Log($"PlanetGenerator trouvé: {planetGenerator != null}");
+        }
             
         if (planetGeneratorNetworked == null)
+        {
             planetGeneratorNetworked = FindObjectOfType<PlanetGeneratorNetworked>();
+            Debug.Log($"PlanetGeneratorNetworked trouvé: {planetGeneratorNetworked != null}");
+        }
             
         if (networkManager == null)
+        {
             networkManager = FindObjectOfType<PlanetNetworkManager>();
+            Debug.Log($"PlanetNetworkManager trouvé: {networkManager != null}");
+        }
+        
+        // Vérifie l'état final
+        Debug.Log($"État final - PlanetGenerator: {planetGenerator != null}, PlanetGeneratorNetworked: {planetGeneratorNetworked != null}, NetworkManager: {networkManager != null}");
+        
+        if (planetGenerator == null && planetGeneratorNetworked == null)
+        {
+            Debug.LogError("Aucun générateur de planète trouvé ! Vérifiez que PlanetGenerator ou PlanetGeneratorNetworked est présent dans la scène.");
+        }
+        else
+        {
+            Debug.Log("✅ Générateur trouvé ! L'UI devrait maintenant fonctionner.");
+        }
+        
+        Debug.Log("=== FIN RECHERCHE DIFFÉRÉE ===");
     }
     
     private void OnGUI()
     {
         if (!showUI) return;
+        
+        // Vérifie périodiquement si les composants sont trouvés
+        if (planetGenerator == null && planetGeneratorNetworked == null)
+        {
+            planetGenerator = FindObjectOfType<PlanetGenerator>();
+            planetGeneratorNetworked = FindObjectOfType<PlanetGeneratorNetworked>();
+        }
         
         // Style pour les boutons
         GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
@@ -45,7 +88,7 @@ public class SimplePlanetUI : MonoBehaviour
         
         // Zone de l'interface
         float panelWidth = 300;
-        float panelHeight = 200;
+        float panelHeight = 300;
         float startX = 20;
         float startY = 20;
         

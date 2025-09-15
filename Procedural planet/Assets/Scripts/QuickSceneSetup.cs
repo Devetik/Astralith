@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishNet.Managing;
 using FishNet.Object;
+using FishNet.Managing.Object;
 
 /// <summary>
 /// Script de récupération rapide de la scène
@@ -58,21 +59,40 @@ public class QuickSceneSetup : MonoBehaviour
         // 0. Nettoie les objets existants
         CleanExistingObjects();
         
-        // 1. Crée le PlanetGenerator avec réseau
+        // 1. Crée le NetworkManager avec DefaultPrefabObjects
+        CreateNetworkManager();
+        
+        // 2. Crée le PlanetGenerator avec réseau
         CreateNetworkedPlanetGenerator();
         
-        // 2. Crée l'UI
+        // 3. Crée l'UI
         CreateUI();
         
-        // 3. Force l'activation de tous les objets
+        // 4. Force l'activation de tous les objets
         ForceActivateAllObjects();
         
         Debug.Log("=== SETUP COMPLET AVEC RÉSEAU TERMINÉ ===");
-        Debug.Log("⚠️ ATTENTION: Ajoutez manuellement le NetworkManager de FishNet !");
-        Debug.Log("1. Créez un GameObject vide nommé 'NetworkManager'");
-        Debug.Log("2. Ajoutez le composant 'NetworkManager' (FishNet)");
-        Debug.Log("3. Ajoutez le composant 'PlanetNetworkManager'");
-        Debug.Log("4. Configurez le NetworkManager dans l'inspecteur");
+        Debug.Log("✅ NetworkManager configuré avec DefaultPrefabObjects !");
+    }
+    
+    [ContextMenu("Réparer la Scène")]
+    public void RepairScene()
+    {
+        Debug.Log("=== RÉPARATION DE LA SCÈNE ===");
+        
+        // 1. Trouve ou crée le PlanetGenerator
+        RepairPlanetGenerator();
+        
+        // 2. Trouve ou crée le PlanetCameraController
+        RepairCameraController();
+        
+        // 3. Assigne les matériaux
+        AssignMaterials();
+        
+        // 4. Active tous les GameObjects
+        ActivateAllObjects();
+        
+        Debug.Log("=== RÉPARATION TERMINÉE ===");
     }
     
     [ContextMenu("Nettoyer et Recréer")]
@@ -226,6 +246,9 @@ public class QuickSceneSetup : MonoBehaviour
     {
         // Configuration de base du NetworkManager
         // Ces paramètres évitent les erreurs NullReference
+        
+        // Crée et assigne le DefaultPrefabObjects
+        CreateAndAssignDefaultPrefabObjects(networkManager);
         
         // Configuration du serveur
         if (networkManager.ServerManager != null)
@@ -381,5 +404,183 @@ public class QuickSceneSetup : MonoBehaviour
         var simpleUI = uiGO.AddComponent<SimplePlanetUI>();
         
         Debug.Log("SimplePlanetUI créé");
+    }
+    
+    private void CreateAndAssignDefaultPrefabObjects(NetworkManager networkManager)
+    {
+#if UNITY_EDITOR
+        // Crée le DefaultPrefabObjects
+        var defaultPrefabObjects = ScriptableObject.CreateInstance<DefaultPrefabObjects>();
+        
+        // Sauvegarde le fichier
+        string path = "Assets/Scripts/DefaultPrefabObjects.asset";
+        UnityEditor.AssetDatabase.CreateAsset(defaultPrefabObjects, path);
+        UnityEditor.AssetDatabase.SaveAssets();
+        UnityEditor.AssetDatabase.Refresh();
+        
+        // Assigne le fichier au NetworkManager
+        networkManager.SpawnablePrefabs = defaultPrefabObjects;
+        
+        Debug.Log($"DefaultPrefabObjects créé et assigné : {path}");
+#else
+        Debug.LogWarning("DefaultPrefabObjects ne peut être créé qu'en mode éditeur !");
+#endif
+    }
+    
+    private void RepairPlanetGenerator()
+    {
+        Debug.Log("--- Réparation PlanetGenerator ---");
+        
+        var planetGenerator = FindObjectOfType<PlanetGenerator>();
+        if (planetGenerator == null)
+        {
+            Debug.Log("PlanetGenerator non trouvé, création...");
+            var go = new GameObject("PlanetGenerator");
+            planetGenerator = go.AddComponent<PlanetGenerator>();
+            go.AddComponent<PlanetSaveManager>();
+            Debug.Log("PlanetGenerator créé !");
+        }
+        else
+        {
+            Debug.Log($"PlanetGenerator trouvé sur {planetGenerator.gameObject.name}");
+        }
+        
+        // S'assure que le GameObject est actif
+        if (!planetGenerator.gameObject.activeInHierarchy)
+        {
+            planetGenerator.gameObject.SetActive(true);
+            Debug.Log("PlanetGenerator activé !");
+        }
+    }
+    
+    private void RepairCameraController()
+    {
+        Debug.Log("--- Réparation CameraController ---");
+        
+        var cameraController = FindObjectOfType<PlanetCameraController>();
+        var mainCamera = Camera.main;
+        
+        if (mainCamera == null)
+        {
+            Debug.Log("Caméra principale non trouvée, création...");
+            var cameraGO = new GameObject("Main Camera");
+            mainCamera = cameraGO.AddComponent<Camera>();
+            cameraGO.tag = "MainCamera";
+            Debug.Log("Caméra principale créée !");
+        }
+        
+        if (cameraController == null)
+        {
+            Debug.Log("PlanetCameraController non trouvé, ajout à la caméra...");
+            cameraController = mainCamera.gameObject.AddComponent<PlanetCameraController>();
+            Debug.Log("PlanetCameraController ajouté !");
+        }
+        else
+        {
+            Debug.Log($"PlanetCameraController trouvé sur {cameraController.gameObject.name}");
+        }
+        
+        // Configure le PlanetCameraController
+        if (cameraController.planetGenerator == null)
+        {
+            var planetGenerator = FindObjectOfType<PlanetGenerator>();
+            if (planetGenerator != null)
+            {
+                cameraController.planetGenerator = planetGenerator;
+                Debug.Log("PlanetGenerator assigné au PlanetCameraController !");
+            }
+        }
+        
+        if (cameraController.planetCenter == null)
+        {
+            var planetGenerator = FindObjectOfType<PlanetGenerator>();
+            if (planetGenerator != null)
+            {
+                cameraController.planetCenter = planetGenerator.transform;
+                Debug.Log("PlanetCenter assigné au PlanetCameraController !");
+            }
+        }
+    }
+    
+    private void AssignMaterials()
+    {
+        Debug.Log("--- Attribution des Matériaux ---");
+        
+        var planetGenerator = FindObjectOfType<PlanetGenerator>();
+        if (planetGenerator == null)
+        {
+            Debug.LogError("PlanetGenerator non trouvé pour l'attribution des matériaux !");
+            return;
+        }
+        
+        // Cherche les matériaux dans le dossier Materials
+        var landMaterial = Resources.Load<Material>("landMaterial");
+        var waterMaterial = Resources.Load<Material>("waterMaterial");
+        
+        if (landMaterial == null)
+        {
+            // Cherche dans le dossier Materials
+            landMaterial = Resources.Load<Material>("Materials/landMaterial");
+        }
+        
+        if (waterMaterial == null)
+        {
+            // Cherche dans le dossier Materials
+            waterMaterial = Resources.Load<Material>("Materials/waterMaterial");
+        }
+        
+        if (landMaterial == null)
+        {
+            Debug.LogWarning("Matériau de terre non trouvé, création d'un matériau par défaut...");
+            landMaterial = CreateDefaultLandMaterial();
+        }
+        
+        if (waterMaterial == null)
+        {
+            Debug.LogWarning("Matériau d'eau non trouvé, création d'un matériau par défaut...");
+            waterMaterial = CreateDefaultWaterMaterial();
+        }
+        
+        // Assigne les matériaux
+        planetGenerator.landMaterial = landMaterial;
+        planetGenerator.waterMaterial = waterMaterial;
+        
+        Debug.Log($"Matériaux assignés - Terre: {landMaterial != null}, Eau: {waterMaterial != null}");
+    }
+    
+    private Material CreateDefaultLandMaterial()
+    {
+        var material = new Material(Shader.Find("Standard"));
+        material.color = Color.green;
+        material.name = "DefaultLandMaterial";
+        return material;
+    }
+    
+    private Material CreateDefaultWaterMaterial()
+    {
+        var material = new Material(Shader.Find("Standard"));
+        material.color = Color.blue;
+        material.name = "DefaultWaterMaterial";
+        return material;
+    }
+    
+    private void ActivateAllObjects()
+    {
+        Debug.Log("--- Activation de tous les GameObjects ---");
+        
+        var allObjects = FindObjectsOfType<GameObject>();
+        int activatedCount = 0;
+        
+        foreach (var obj in allObjects)
+        {
+            if (!obj.activeInHierarchy)
+            {
+                obj.SetActive(true);
+                activatedCount++;
+                Debug.Log($"Activé: {obj.name}");
+            }
+        }
+        
+        Debug.Log($"Nombre d'objets activés: {activatedCount}");
     }
 }
