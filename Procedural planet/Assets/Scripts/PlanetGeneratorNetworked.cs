@@ -300,7 +300,7 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
         UpdateSettingsFromInspector();
         
         // Si le réseau n'est pas actif ou pas connecté, génère directement
-        if (!IsNetworked || !IsServerStarted)
+        if (!GetIsNetworked() || !IsServerStarted)
         {
             GeneratePlanetInternal();
         }
@@ -337,7 +337,7 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void GeneratePlanetServerRpc()
     {
-        if (!IsServer)
+        if (!IsServerInitialized)
         {
             Debug.LogWarning("GeneratePlanetServerRpc appelé mais pas serveur");
             return;
@@ -394,7 +394,7 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
     [ObserversRpc]
     private void SendSettingsToClientsRpc(PlanetSettingsData settings)
     {
-        if (IsServer) return; // Le serveur ne doit pas exécuter ce RPC
+        if (IsServerInitialized) return; // Le serveur ne doit pas exécuter ce RPC
 
         Debug.Log("Paramètres reçus du serveur");
         
@@ -444,11 +444,7 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
         _planetGenerator.warpStrength = this.warpStrength;
         _planetGenerator.oceanLevel = this.oceanLevel;
         
-        // Utilise les matériaux de PlanetGenerator si ils sont assignés
-        if (_planetGenerator.landMaterial != null)
-            _planetGenerator.landMaterial = _planetGenerator.landMaterial;
-        if (_planetGenerator.waterMaterial != null)
-            _planetGenerator.waterMaterial = _planetGenerator.waterMaterial;
+        // Les matériaux sont déjà assignés dans PlanetGenerator, pas besoin de les réassigner
             
     }
 

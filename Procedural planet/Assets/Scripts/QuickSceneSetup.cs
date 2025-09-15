@@ -101,7 +101,7 @@ public class QuickSceneSetup : MonoBehaviour
         Debug.Log("=== NETTOYAGE DES OBJETS EXISTANTS ===");
         
         // Supprime les NetworkManagers existants
-        var existingManagers = FindObjectsOfType<NetworkManager>();
+        var existingManagers = FindObjectsByType<NetworkManager>(FindObjectsSortMode.None);
         foreach (var manager in existingManagers)
         {
             if (manager != null)
@@ -112,7 +112,7 @@ public class QuickSceneSetup : MonoBehaviour
         }
         
         // Supprime les PlanetGenerators existants
-        var existingGenerators = FindObjectsOfType<PlanetGeneratorNetworked>();
+        var existingGenerators = FindObjectsByType<PlanetGeneratorNetworked>(FindObjectsSortMode.None);
         foreach (var generator in existingGenerators)
         {
             if (generator != null)
@@ -123,7 +123,7 @@ public class QuickSceneSetup : MonoBehaviour
         }
         
         // Supprime les UIs existantes
-        var existingUIs = FindObjectsOfType<SimplePlanetUI>();
+        var existingUIs = FindObjectsByType<SimplePlanetUI>(FindObjectsSortMode.None);
         foreach (var ui in existingUIs)
         {
             if (ui != null)
@@ -142,7 +142,7 @@ public class QuickSceneSetup : MonoBehaviour
         Debug.Log("=== FORÇAGE DE L'ACTIVATION ===");
         
         // Active le PlanetGenerator s'il existe
-        var planetGenerator = FindObjectOfType<PlanetGeneratorNetworked>();
+        var planetGenerator = FindFirstObjectByType<PlanetGeneratorNetworked>();
         if (planetGenerator != null)
         {
             planetGenerator.gameObject.SetActive(true);
@@ -150,7 +150,7 @@ public class QuickSceneSetup : MonoBehaviour
         }
         
         // Active l'UI s'il existe
-        var ui = FindObjectOfType<SimplePlanetUI>();
+        var ui = FindFirstObjectByType<SimplePlanetUI>();
         if (ui != null)
         {
             ui.gameObject.SetActive(true);
@@ -169,7 +169,7 @@ public class QuickSceneSetup : MonoBehaviour
         var mainCamera = Camera.main;
         if (mainCamera == null)
         {
-            mainCamera = FindObjectOfType<Camera>();
+            mainCamera = FindFirstObjectByType<Camera>();
         }
         
         if (mainCamera == null)
@@ -212,7 +212,7 @@ public class QuickSceneSetup : MonoBehaviour
     private void CreateNetworkManager()
     {
         // Cherche s'il existe déjà
-        var existingManager = FindObjectOfType<NetworkManager>();
+        var existingManager = FindFirstObjectByType<NetworkManager>();
         if (existingManager != null)
         {
             Debug.Log("NetworkManager existe déjà");
@@ -277,7 +277,7 @@ public class QuickSceneSetup : MonoBehaviour
     private void CreatePlanetGenerator()
     {
         // Cherche s'il existe déjà
-        var existingGenerator = FindObjectOfType<PlanetGeneratorNetworked>();
+        var existingGenerator = FindFirstObjectByType<PlanetGeneratorNetworked>();
         if (existingGenerator != null)
         {
             Debug.Log("PlanetGenerator existe déjà");
@@ -318,7 +318,7 @@ public class QuickSceneSetup : MonoBehaviour
     private void CreateSimplePlanetGenerator()
     {
         // Cherche s'il existe déjà
-        var existingGenerator = FindObjectOfType<PlanetGenerator>();
+        var existingGenerator = FindFirstObjectByType<PlanetGenerator>();
         if (existingGenerator != null)
         {
             Debug.Log("PlanetGenerator simple existe déjà");
@@ -351,7 +351,7 @@ public class QuickSceneSetup : MonoBehaviour
     private void CreateNetworkedPlanetGenerator()
     {
         // Cherche s'il existe déjà
-        var existingGenerator = FindObjectOfType<PlanetGeneratorNetworked>();
+        var existingGenerator = FindFirstObjectByType<PlanetGeneratorNetworked>();
         if (existingGenerator != null)
         {
             Debug.Log("PlanetGeneratorNetworked existe déjà");
@@ -392,7 +392,7 @@ public class QuickSceneSetup : MonoBehaviour
     private void CreateUI()
     {
         // Cherche s'il existe déjà
-        var existingUI = FindObjectOfType<SimplePlanetUI>();
+        var existingUI = FindFirstObjectByType<SimplePlanetUI>();
         if (existingUI != null)
         {
             Debug.Log("SimplePlanetUI existe déjà");
@@ -431,7 +431,7 @@ public class QuickSceneSetup : MonoBehaviour
     {
         Debug.Log("--- Réparation PlanetGenerator ---");
         
-        var planetGenerator = FindObjectOfType<PlanetGenerator>();
+        var planetGenerator = FindFirstObjectByType<PlanetGenerator>();
         if (planetGenerator == null)
         {
             Debug.Log("PlanetGenerator non trouvé, création...");
@@ -457,7 +457,7 @@ public class QuickSceneSetup : MonoBehaviour
     {
         Debug.Log("--- Réparation CameraController ---");
         
-        var cameraController = FindObjectOfType<PlanetCameraController>();
+        var cameraController = FindFirstObjectByType<PlanetCameraController>();
         var mainCamera = Camera.main;
         
         if (mainCamera == null)
@@ -483,7 +483,7 @@ public class QuickSceneSetup : MonoBehaviour
         // Configure le PlanetCameraController
         if (cameraController.planetGenerator == null)
         {
-            var planetGenerator = FindObjectOfType<PlanetGenerator>();
+            var planetGenerator = FindFirstObjectByType<PlanetGenerator>();
             if (planetGenerator != null)
             {
                 cameraController.planetGenerator = planetGenerator;
@@ -493,7 +493,7 @@ public class QuickSceneSetup : MonoBehaviour
         
         if (cameraController.planetCenter == null)
         {
-            var planetGenerator = FindObjectOfType<PlanetGenerator>();
+            var planetGenerator = FindFirstObjectByType<PlanetGenerator>();
             if (planetGenerator != null)
             {
                 cameraController.planetCenter = planetGenerator.transform;
@@ -506,7 +506,7 @@ public class QuickSceneSetup : MonoBehaviour
     {
         Debug.Log("--- Attribution des Matériaux ---");
         
-        var planetGenerator = FindObjectOfType<PlanetGenerator>();
+        var planetGenerator = FindFirstObjectByType<PlanetGenerator>();
         if (planetGenerator == null)
         {
             Debug.LogError("PlanetGenerator non trouvé pour l'attribution des matériaux !");
@@ -568,7 +568,7 @@ public class QuickSceneSetup : MonoBehaviour
     {
         Debug.Log("--- Activation de tous les GameObjects ---");
         
-        var allObjects = FindObjectsOfType<GameObject>();
+        var allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         int activatedCount = 0;
         
         foreach (var obj in allObjects)

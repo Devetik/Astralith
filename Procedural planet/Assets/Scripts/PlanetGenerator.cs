@@ -97,7 +97,7 @@ public class PlanetGenerator : MonoBehaviour
 
         // Notifie le contrôleur de caméra
         if (cameraController == null)
-            cameraController = FindObjectOfType<PlanetCameraController>();
+            cameraController = FindFirstObjectByType<PlanetCameraController>();
         
         if (cameraController != null)
             cameraController.OnPlanetGenerated();

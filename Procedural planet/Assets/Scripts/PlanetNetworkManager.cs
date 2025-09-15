@@ -23,7 +23,7 @@ public class PlanetNetworkManager : MonoBehaviour
 
     private void Start()
     {
-        _networkManager = FindObjectOfType<NetworkManager>();
+        _networkManager = FindFirstObjectByType<NetworkManager>();
         if (_networkManager == null)
         {
             Debug.LogError("NetworkManager non trouvé ! Assurez-vous d'avoir un NetworkManager dans la scène.");
@@ -38,7 +38,7 @@ public class PlanetNetworkManager : MonoBehaviour
             
             // Si pas trouvé, cherche dans la scène
             if (planetGeneratorNetworked == null)
-                planetGeneratorNetworked = FindObjectOfType<PlanetGeneratorNetworked>();
+                planetGeneratorNetworked = FindFirstObjectByType<PlanetGeneratorNetworked>();
         }
 
         // Configure les callbacks

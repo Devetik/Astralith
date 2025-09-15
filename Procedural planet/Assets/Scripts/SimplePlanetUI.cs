@@ -34,19 +34,19 @@ public class SimplePlanetUI : MonoBehaviour
         // Trouve automatiquement les composants si non assignés
         if (planetGenerator == null)
         {
-            planetGenerator = FindObjectOfType<PlanetGenerator>();
+            planetGenerator = FindFirstObjectByType<PlanetGenerator>();
             Debug.Log($"PlanetGenerator trouvé: {planetGenerator != null}");
         }
             
         if (planetGeneratorNetworked == null)
         {
-            planetGeneratorNetworked = FindObjectOfType<PlanetGeneratorNetworked>();
+            planetGeneratorNetworked = FindFirstObjectByType<PlanetGeneratorNetworked>();
             Debug.Log($"PlanetGeneratorNetworked trouvé: {planetGeneratorNetworked != null}");
         }
             
         if (networkManager == null)
         {
-            networkManager = FindObjectOfType<PlanetNetworkManager>();
+            networkManager = FindFirstObjectByType<PlanetNetworkManager>();
             Debug.Log($"PlanetNetworkManager trouvé: {networkManager != null}");
         }
         
@@ -72,8 +72,8 @@ public class SimplePlanetUI : MonoBehaviour
         // Vérifie périodiquement si les composants sont trouvés
         if (planetGenerator == null && planetGeneratorNetworked == null)
         {
-            planetGenerator = FindObjectOfType<PlanetGenerator>();
-            planetGeneratorNetworked = FindObjectOfType<PlanetGeneratorNetworked>();
+            planetGenerator = FindFirstObjectByType<PlanetGenerator>();
+            planetGeneratorNetworked = FindFirstObjectByType<PlanetGeneratorNetworked>();
         }
         
         // Style pour les boutons
@@ -88,7 +88,7 @@ public class SimplePlanetUI : MonoBehaviour
         
         // Zone de l'interface
         float panelWidth = 300;
-        float panelHeight = 300;
+        float panelHeight = 295;
         float startX = 20;
         float startY = 20;
         

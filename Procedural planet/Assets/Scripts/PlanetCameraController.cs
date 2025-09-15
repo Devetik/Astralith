@@ -33,7 +33,7 @@ public class PlanetCameraController : MonoBehaviour
     {
         // Trouve automatiquement le générateur de planète si non assigné
         if (planetGenerator == null)
-            planetGenerator = FindObjectOfType<PlanetGenerator>();
+            planetGenerator = FindFirstObjectByType<PlanetGenerator>();
 
         // Trouve automatiquement le centre de la planète
         if (planetCenter == null && planetGenerator != null)
