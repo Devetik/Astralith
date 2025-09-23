@@ -75,6 +75,23 @@ public class QuickSceneSetup : MonoBehaviour
         Debug.Log("✅ NetworkManager configuré avec DefaultPrefabObjects !");
     }
     
+    [ContextMenu("Afficher IP Locale")]
+    public void ShowLocalIP()
+    {
+        Debug.Log("=== ADRESSES IP LOCALES ===");
+        
+        var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+        foreach (var ip in host.AddressList)
+        {
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                Debug.Log($"IP Locale: {ip}");
+            }
+        }
+        
+        Debug.Log("=== FIN ADRESSES IP ===");
+    }
+    
     [ContextMenu("Réparer la Scène")]
     public void RepairScene()
     {

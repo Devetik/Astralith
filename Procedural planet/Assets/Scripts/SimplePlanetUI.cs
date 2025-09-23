@@ -16,6 +16,11 @@ public class SimplePlanetUI : MonoBehaviour
     public Color buttonColor = Color.white;
     public Color textColor = Color.white;
     
+    [Header("Configuration Réseau")]
+    public bool showNetworkConfig = true;
+    private string _serverIP = "127.0.0.1";
+    private string _serverPort = "7772";
+    
     private void Start()
     {
         Debug.Log("=== SIMPLEPLANETUI START ===");
@@ -48,6 +53,13 @@ public class SimplePlanetUI : MonoBehaviour
         {
             networkManager = FindFirstObjectByType<PlanetNetworkManager>();
             Debug.Log($"PlanetNetworkManager trouvé: {networkManager != null}");
+        }
+        
+        // Initialise les valeurs réseau depuis le NetworkManager
+        if (networkManager != null)
+        {
+            _serverIP = networkManager.serverIP;
+            _serverPort = networkManager.serverPort.ToString();
         }
         
         // Vérifie l'état final
@@ -157,6 +169,29 @@ public class SimplePlanetUI : MonoBehaviour
             currentY += 40;
         }
         
+        // Section Configuration Réseau
+        if (showNetworkConfig)
+        {
+            GUI.Label(new Rect(startX, currentY, panelWidth, 25), "=== CONFIGURATION RÉSEAU ===", labelStyle);
+            currentY += 30;
+            
+            // Champ IP du serveur
+            GUI.Label(new Rect(startX, currentY, 80, 25), "IP Serveur:", labelStyle);
+            _serverIP = GUI.TextField(new Rect(startX + 85, currentY, 120, 25), _serverIP);
+            currentY += 30;
+            
+            // Champ Port du serveur
+            GUI.Label(new Rect(startX, currentY, 80, 25), "Port:", labelStyle);
+            _serverPort = GUI.TextField(new Rect(startX + 85, currentY, 60, 25), _serverPort);
+            
+            // Bouton Appliquer Configuration
+            if (GUI.Button(new Rect(startX + 150, currentY, 100, 25), "Appliquer", buttonStyle))
+            {
+                ApplyNetworkConfig();
+            }
+            currentY += 35;
+        }
+        
         // Section Multijoueur
         GUI.Label(new Rect(startX, currentY, panelWidth, 25), "=== MULTIJOUEUR ===", labelStyle);
         currentY += 30;
@@ -198,6 +233,41 @@ public class SimplePlanetUI : MonoBehaviour
         {
             GUI.Label(new Rect(startX, currentY, panelWidth, 25), "NetworkManager non trouvé", labelStyle);
         }
+    }
+    
+    private void ApplyNetworkConfig()
+    {
+        if (networkManager == null)
+        {
+            Debug.LogError("NetworkManager non trouvé pour appliquer la configuration réseau !");
+            return;
+        }
+        
+        // Valide et applique l'IP
+        if (System.Net.IPAddress.TryParse(_serverIP, out System.Net.IPAddress ipAddress))
+        {
+            networkManager.serverIP = _serverIP;
+            Debug.Log($"IP du serveur mise à jour: {_serverIP}");
+        }
+        else
+        {
+            Debug.LogError($"IP invalide: {_serverIP}");
+            _serverIP = networkManager.serverIP; // Restaure l'ancienne valeur
+        }
+        
+        // Valide et applique le port
+        if (ushort.TryParse(_serverPort, out ushort port) && port > 0)
+        {
+            networkManager.serverPort = port;
+            Debug.Log($"Port du serveur mis à jour: {port}");
+        }
+        else
+        {
+            Debug.LogError($"Port invalide: {_serverPort}");
+            _serverPort = networkManager.serverPort.ToString(); // Restaure l'ancienne valeur
+        }
+        
+        Debug.Log("Configuration réseau appliquée !");
     }
 }
 

@@ -33,6 +33,10 @@ public class PlanetSettings
 
     [Header("Océans")]
     public float oceanLevel = 0.05f;
+    
+    [Header("Configuration Réseau")]
+    public string serverIP = "127.0.0.1";
+    public ushort serverPort = 7772;
 
     // Constructeur par défaut
     public PlanetSettings()
@@ -75,6 +79,14 @@ public class PlanetSettings
         settings.warpStrength = generator.warpStrength;
         settings.oceanLevel = generator.oceanLevel;
         
+        // Configuration réseau (récupérée depuis PlanetNetworkManager)
+        var networkManager = UnityEngine.Object.FindFirstObjectByType<PlanetNetworkManager>();
+        if (networkManager != null)
+        {
+            settings.serverIP = networkManager.serverIP;
+            settings.serverPort = networkManager.serverPort;
+        }
+        
         settings.landMaterialPath = "";
         settings.waterMaterialPath = "";
         
@@ -104,6 +116,14 @@ public class PlanetSettings
         generator.warpFreq = this.warpFreq;
         generator.warpStrength = this.warpStrength;
         generator.oceanLevel = this.oceanLevel;
+        
+        // Configuration réseau (appliquée au PlanetNetworkManager)
+        var networkManager = UnityEngine.Object.FindFirstObjectByType<PlanetNetworkManager>();
+        if (networkManager != null)
+        {
+            networkManager.serverIP = this.serverIP;
+            networkManager.serverPort = this.serverPort;
+        }
     }
 
     // Chemins des matériaux (pour la sérialisation)
