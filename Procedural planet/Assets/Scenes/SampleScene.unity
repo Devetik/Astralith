@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &150902838
+--- !u!1 &93469828
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,61 +127,206 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 150902841}
-  - component: {fileID: 150902840}
-  - component: {fileID: 150902839}
+  - component: {fileID: 93469833}
+  - component: {fileID: 93469832}
+  - component: {fileID: 93469831}
+  - component: {fileID: 93469830}
+  - component: {fileID: 93469829}
   m_Layer: 0
-  m_Name: NetworkManager
+  m_Name: PlanetGenerator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &150902839
+--- !u!114 &93469829
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 150902838}
+  m_GameObject: {fileID: 93469828}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a06ac9ddbf0396458c9448bbea5254a, type: 3}
+  m_Script: {fileID: 11500000, guid: 3641dc9efc300c14ba395b6085ab6c71, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverIP: 127.0.0.1
-  serverPort: 7772
-  autoConnectAsClient: 1
-  autoConnectInterval: 1
-  planetGeneratorNetworked: {fileID: 0}
-  _isAutoConnecting: 0
-  _isHostMode: 0
---- !u!114 &150902840
+  saveFileName: planet_settings.json
+  autoSaveOnGenerate: 1
+  autoLoadOnStart: 1
+--- !u!114 &93469830
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 150902838}
+  m_GameObject: {fileID: 93469828}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2c95dfde7d73b54dbbdc23155d35d36, type: 3}
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _refreshDefaultPrefabs: 0
-  _runInBackground: 1
-  _dontDestroyOnLoad: 1
-  _objectPool: {fileID: 0}
-  _persistence: 0
-  _logging: {fileID: 0}
-  _spawnablePrefabs: {fileID: 11400000, guid: 6c0ebfe1bb2f10f4e955a2f609ee61ea, type: 2}
---- !u!4 &150902841
+  <IsNested>k__BackingField: 0
+  WasActiveDuringEdit: 1
+  WasActiveDuringEdit_Set1: 1
+  <ComponentIndex>k__BackingField: 0
+  <PredictedSpawn>k__BackingField: {fileID: 0}
+  <PredictedOwner>k__BackingField: {fileID: 0}
+  NetworkBehaviours: []
+  InitializedParentNetworkBehaviour: {fileID: 0}
+  InitializedNestedNetworkObjects: []
+  RuntimeParentNetworkBehaviour: {fileID: 0}
+  RuntimeChildNetworkBehaviours: []
+  _isNetworked: 1
+  _isSpawnable: 1
+  _isGlobal: 0
+  _initializeOrder: 0
+  _preventDespawnOnDisconnect: 0
+  _defaultDespawnType: 0
+  NetworkObserver: {fileID: 0}
+  _enablePrediction: 0
+  _predictionType: 0
+  _graphicalObject: {fileID: 0}
+  _detachGraphicalObject: 0
+  _enableStateForwarding: 1
+  _networkTransform: {fileID: 0}
+  _ownerInterpolation: 1
+  _ownerSmoothedProperties: 255
+  _adaptiveInterpolation: 3
+  _spectatorSmoothedProperties: 255
+  _spectatorInterpolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  <PrefabId>k__BackingField: 65535
+  <SpawnableCollectionId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 0
+  <SceneId>k__BackingField: 4293391692
+  SerializedTransformProperties:
+    Position: {x: 0, y: 0, z: 0}
+    Rotation: {x: 0, y: 0, z: 0, w: 0}
+    Scale: {x: 0, y: 0, z: 0}
+    IsValid: 0
+--- !u!114 &93469831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 93469828}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81a2d1e53ba0af846a87904fea898e20, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 93469830}
+  _networkObjectCache: {fileID: 0}
+  resolution: 64
+  radius: 1
+  seed: 12345
+  octaves: 5
+  lacunarity: 2
+  persistence: 0.5
+  continentFreq: 0.15
+  continentAmp: 0.25
+  continentCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  mountainFreq: 2
+  mountainAmp: 0.15
+  mountainMaskFreq: 0.6
+  mountainMaskPower: 1.4
+  useWarp: 1
+  warpFreq: 0.5
+  warpStrength: 0.2
+  landMaterial: {fileID: 2100000, guid: a0fe960f31e7a0642988142ed47881c0, type: 2}
+  waterMaterial: {fileID: 2100000, guid: 660f20cea2939564cbde6c027d47e0ac, type: 2}
+  oceanLevel: 0.2
+--- !u!114 &93469832
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 93469828}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13aa8cb86d502e64d8b099fb3789bd8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnPoint: {fileID: 0}
+  parent: {fileID: 0}
+  resolution: 64
+  radius: 1
+  addMeshCollider: 1
+  seed: 12345
+  octaves: 5
+  lacunarity: 2
+  persistence: 0.5
+  continentFreq: 0.25
+  continentAmp: 0.15
+  continentCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  mountainFreq: 2
+  mountainAmp: 0.1
+  mountainMaskFreq: 0.6
+  mountainMaskPower: 1.4
+  useWarp: 1
+  warpFreq: 0.5
+  warpStrength: 0.2
+  landMaterial: {fileID: 2100000, guid: 9cbc5d164dbc15044a184ee4ec6c6629, type: 2}
+  waterMaterial: {fileID: 2100000, guid: b16f1b93d929df94585faf284d53ecb2, type: 2}
+  oceanLevel: 0.2
+--- !u!4 &93469833
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 150902838}
+  m_GameObject: {fileID: 93469828}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -337,17 +482,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 330585543}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 67864e1013ce15845894858259bb1328, type: 3}
+  m_Script: {fileID: 11500000, guid: d46d7cf24c2403c4f83d30c31d19cd7c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  planetCenter: {fileID: 1440315856}
-  planetGenerator: {fileID: 1440315855}
-  mouseSensitivity: 2
-  scrollSensitivity: 40
+  planetCenter: {fileID: 0}
+  planetGenerator: {fileID: 93469832}
+  mouseSensitivity: 1
+  scrollSensitivity: 2
   rotateKey: 324
   lockCursorWhenRotating: 0
   minDistance: 5
-  maxDistance: 50
+  maxDistance: 1000
   minVerticalAngle: -80
   maxVerticalAngle: 80
   rotationSpeed: 5
@@ -522,6 +667,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &889869178 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+  m_PrefabInstance: {fileID: 1498405297}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &889869181
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 889869178}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: f838cef6305561a428d5998983150282, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1158894211
 GameObject:
   m_ObjectHideFlags: 0
@@ -562,7 +734,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1323728791}
-  - component: {fileID: 1323728790}
+  - component: {fileID: 1323728792}
   m_Layer: 0
   m_Name: QuickSetUp
   m_TagString: Untagged
@@ -570,18 +742,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1323728790
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1323728789}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3108e9af794189645a56999f2c713293, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!4 &1323728791
 Transform:
   m_ObjectHideFlags: 0
@@ -597,273 +757,82 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1440315851
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1440315856}
-  - component: {fileID: 1440315855}
-  - component: {fileID: 1440315854}
-  - component: {fileID: 1440315853}
-  - component: {fileID: 1440315852}
-  m_Layer: 0
-  m_Name: PlanetGenerator
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1440315852
+--- !u!114 &1323728792
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1440315851}
+  m_GameObject: {fileID: 1323728789}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a7fad18f505c79c4793db437260334f0, type: 3}
+  m_Script: {fileID: 11500000, guid: 620edbb1bec517f44aef21064c496201, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  saveFileName: planet_settings2.json
-  autoSaveOnGenerate: 1
-  autoLoadOnStart: 1
---- !u!114 &1440315853
-MonoBehaviour:
+--- !u!1001 &1498405297
+PrefabInstance:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1440315851}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  <IsNested>k__BackingField: 0
-  WasActiveDuringEdit: 1
-  WasActiveDuringEdit_Set1: 1
-  <ComponentIndex>k__BackingField: 0
-  <PredictedSpawn>k__BackingField: {fileID: 0}
-  <PredictedOwner>k__BackingField: {fileID: 0}
-  NetworkBehaviours: []
-  InitializedParentNetworkBehaviour: {fileID: 0}
-  InitializedNestedNetworkObjects: []
-  RuntimeParentNetworkBehaviour: {fileID: 0}
-  RuntimeChildNetworkBehaviours: []
-  _isNetworked: 1
-  _isSpawnable: 1
-  _isGlobal: 0
-  _initializeOrder: 0
-  _preventDespawnOnDisconnect: 0
-  _defaultDespawnType: 0
-  NetworkObserver: {fileID: 0}
-  _enablePrediction: 0
-  _predictionType: 0
-  _graphicalObject: {fileID: 0}
-  _detachGraphicalObject: 0
-  _enableStateForwarding: 1
-  _networkTransform: {fileID: 0}
-  _ownerInterpolation: 1
-  _ownerSmoothedProperties: 255
-  _adaptiveInterpolation: 3
-  _spectatorSmoothedProperties: 255
-  _spectatorInterpolation: 2
-  _enableTeleport: 0
-  _teleportThreshold: 1
-  <PrefabId>k__BackingField: 65535
-  <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 0
-  <SceneId>k__BackingField: 2079577943
-  SerializedTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
-    Rotation: {x: 0, y: 0, z: 0, w: 0}
-    Scale: {x: 0, y: 0, z: 0}
-    IsValid: 0
---- !u!114 &1440315854
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1440315851}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _componentIndexCache: 255
-  _addedNetworkObject: {fileID: 1440315853}
-  _networkObjectCache: {fileID: 0}
-  resolution: 64
-  radius: 1
-  seed: 12345
-  octaves: 5
-  lacunarity: 2
-  persistence: 0.5
-  continentFreq: 0.15
-  continentAmp: 0.25
-  continentCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  mountainFreq: 2
-  mountainAmp: 0.15
-  mountainMaskFreq: 0.6
-  mountainMaskPower: 1.4
-  useWarp: 1
-  warpFreq: 0.5
-  warpStrength: 0.2
-  landMaterial: {fileID: 2100000, guid: 9cbc5d164dbc15044a184ee4ec6c6629, type: 2}
-  waterMaterial: {fileID: 2100000, guid: b16f1b93d929df94585faf284d53ecb2, type: 2}
-  oceanLevel: 0.2
---- !u!114 &1440315855
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1440315851}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7cf4076b9df462d4a8ff83afe645f1f6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnPoint: {fileID: 0}
-  parent: {fileID: 0}
-  resolution: 64
-  radius: 1
-  addMeshCollider: 1
-  seed: 12345
-  octaves: 5
-  lacunarity: 2
-  persistence: 0.5
-  continentFreq: 0.25
-  continentAmp: 0.15
-  continentCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  mountainFreq: 2
-  mountainAmp: 0.1
-  mountainMaskFreq: 0.6
-  mountainMaskPower: 1.4
-  useWarp: 1
-  warpFreq: 0.5
-  warpStrength: 0.2
-  landMaterial: {fileID: 2100000, guid: a0fe960f31e7a0642988142ed47881c0, type: 2}
-  waterMaterial: {fileID: 2100000, guid: 660f20cea2939564cbde6c027d47e0ac, type: 2}
-  oceanLevel: 0.2
---- !u!4 &1440315856
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1440315851}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1720130247
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1720130249}
-  - component: {fileID: 1720130248}
-  m_Layer: 0
-  m_Name: PlanetUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1720130248
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1720130247}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bf780557b53604f43b5a8878ffdb4c07, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  planetGenerator: {fileID: 0}
-  planetGeneratorNetworked: {fileID: 0}
-  networkManager: {fileID: 0}
-  showUI: 1
-  fontSize: 16
-  buttonColor: {r: 1, g: 1, b: 1, a: 1}
-  textColor: {r: 1, g: 1, b: 1, a: 1}
---- !u!4 &1720130249
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1720130247}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -1.2546126
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.619
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -24.66772
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.16251609
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.9867059
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -161.294
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_Name
+      value: MVP
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 889869181}
+  m_SourcePrefab: {fileID: 100100000, guid: 19578b012252e234e9ff16b4b3f48076, type: 3}
 --- !u!1 &1777667497
 GameObject:
   m_ObjectHideFlags: 0
@@ -943,6 +912,129 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1941344965
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1941344967}
+  - component: {fileID: 1941344966}
+  m_Layer: 0
+  m_Name: PlanetUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1941344966
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1941344965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3af63c1423e81c64e97577675235f897, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  planetGenerator: {fileID: 0}
+  planetGeneratorNetworked: {fileID: 0}
+  networkManager: {fileID: 0}
+  showUI: 1
+  fontSize: 16
+  buttonColor: {r: 1, g: 1, b: 1, a: 1}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  showNetworkConfig: 1
+--- !u!4 &1941344967
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1941344965}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1952863712
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1952863715}
+  - component: {fileID: 1952863714}
+  - component: {fileID: 1952863713}
+  m_Layer: 0
+  m_Name: NetworkManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1952863713
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1952863712}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f48a7bc8f44bcf4ab0ba023d2893876, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverIP: 127.0.0.1
+  serverPort: 7772
+  autoConnectAsClient: 1
+  autoConnectInterval: 1
+  planetGeneratorNetworked: {fileID: 0}
+  _isAutoConnecting: 0
+  _isHostMode: 0
+--- !u!114 &1952863714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1952863712}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2c95dfde7d73b54dbbdc23155d35d36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _refreshDefaultPrefabs: 0
+  _runInBackground: 1
+  _dontDestroyOnLoad: 1
+  _objectPool: {fileID: 0}
+  _persistence: 0
+  _logging: {fileID: 0}
+  _spawnablePrefabs: {fileID: 11400000, guid: 6c0ebfe1bb2f10f4e955a2f609ee61ea, type: 2}
+--- !u!4 &1952863715
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1952863712}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -953,6 +1045,7 @@ SceneRoots:
   - {fileID: 1777667500}
   - {fileID: 1158894212}
   - {fileID: 1323728791}
-  - {fileID: 150902841}
-  - {fileID: 1440315856}
-  - {fileID: 1720130249}
+  - {fileID: 1498405297}
+  - {fileID: 1952863715}
+  - {fileID: 93469833}
+  - {fileID: 1941344967}
