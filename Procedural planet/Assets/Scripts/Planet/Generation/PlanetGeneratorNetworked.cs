@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using System;
 
 /// <summary>
 /// Générateur de planète avec synchronisation réseau
@@ -33,6 +34,9 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
     public Material waterMaterial;
     [Range(0f,1f)]
     public float oceanLevel = 0.2f;      // Plus bas = plus de terre
+    
+    // Événement pour notifier la génération de planète
+    public static event Action OnPlanetGenerated;
 
     [Header("Synchronisation Réseau")]
     private PlanetSettingsData _currentSettings = new PlanetSettingsData();
@@ -200,7 +204,7 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
     public void GenerateNewSeed()
     {
         // Génère une nouvelle seed aléatoire
-        int newSeed = Random.Range(0, int.MaxValue);
+        int newSeed = UnityEngine.Random.Range(0, int.MaxValue);
         
         // Met à jour la seed dans les paramètres networkés (c'est la source de vérité)
         this.seed = newSeed;
@@ -386,6 +390,9 @@ public class PlanetGeneratorNetworked : NetworkBehaviour
         {
             Debug.Log("Serveur actif mais aucun client connecté");
         }
+        
+        // Notifie l'événement de génération de planète
+        OnPlanetGenerated?.Invoke();
     }
 
     /// <summary>

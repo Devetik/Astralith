@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 public class PlanetGenerator : MonoBehaviour
 {
@@ -38,6 +39,9 @@ public class PlanetGenerator : MonoBehaviour
     public Material landMaterial;
     public Material waterMaterial;
     [Range(0f,1f)] public float oceanLevel = 0.2f; // 20% au-dessus du rayon
+    
+    // Événement pour notifier la génération de planète
+    public static event Action OnPlanetGenerated;
 
     private GameObject currentPlanetGO;
     private PlanetSaveManager saveManager;
@@ -62,6 +66,7 @@ public class PlanetGenerator : MonoBehaviour
 
         var land = new GameObject("LandMesh");
         land.transform.SetParent(currentPlanetGO.transform, false);
+        land.tag = "Land"; // Assigne le tag Land
 
         var mf = land.AddComponent<MeshFilter>();
         var mr = land.AddComponent<MeshRenderer>();
@@ -80,6 +85,7 @@ public class PlanetGenerator : MonoBehaviour
         {
             var ocean = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             ocean.name = "Ocean";
+            ocean.tag = "Water"; // Assigne le tag Water
             ocean.transform.SetParent(currentPlanetGO.transform, false);
             float oceanR = radius * (1f + oceanLevel);
             ocean.transform.localScale = Vector3.one * (oceanR * 2f);
@@ -101,6 +107,9 @@ public class PlanetGenerator : MonoBehaviour
         
         if (cameraController != null)
             cameraController.OnPlanetGenerated();
+            
+        // Notifie l'événement de génération de planète
+        OnPlanetGenerated?.Invoke();
     }
 
     /// <summary>
