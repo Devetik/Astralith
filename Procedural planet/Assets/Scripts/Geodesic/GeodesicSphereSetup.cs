@@ -15,9 +15,11 @@ namespace Geodesic
         [Header("Nouveau Système Sphérique")]
         public GeodesicSpherePlanetGenerator sphereGenerator;
         public GeodesicSphereGrid sphereGrid;
+        public GeodesicBiomeGenerator biomeGenerator;
         
         [Header("Matériaux")]
         public Material landMaterial;
+        
         public Material waterMaterial;
         
         [Header("Paramètres de Génération")]
@@ -28,6 +30,9 @@ namespace Geodesic
         public int customFrequency = 11; // Fréquence personnalisée (si Custom)
         public float cellSize = 1f; // Taille d'une cellule
         public float landRatio = 0.3f; // 30% de terre, 70% d'eau
+        
+        [Header("Biomes")]
+        public bool useBiomes = true; // Active le système de biomes
         
         public enum CellConfiguration
         {
@@ -149,6 +154,20 @@ namespace Geodesic
                 }
             }
             
+            // Trouve le générateur de biomes
+            if (biomeGenerator == null)
+            {
+                biomeGenerator = FindObjectOfType<GeodesicBiomeGenerator>();
+                if (biomeGenerator == null)
+                {
+                    biomeGenerator = gameObject.AddComponent<GeodesicBiomeGenerator>();
+                    if (showDebugInfo)
+                    {
+                        Debug.Log("Générateur de biomes créé");
+                    }
+                }
+            }
+            
             // Trouve la grille sphérique
             if (sphereGrid == null)
             {
@@ -179,6 +198,16 @@ namespace Geodesic
                 sphereGenerator.landMaterial = landMaterial;
                 sphereGenerator.waterMaterial = waterMaterial;
                 sphereGenerator.showDebugInfo = showDebugInfo;
+                
+                // Configure le générateur de biomes
+                if (biomeGenerator != null)
+                {
+                    biomeGenerator.seed = seed;
+                    biomeGenerator.landRatio = landRatio;
+                    biomeGenerator.showDebugInfo = showDebugInfo;
+                    sphereGenerator.biomeGenerator = biomeGenerator;
+                    sphereGenerator.useBiomes = useBiomes;
+                }
                 
                 if (showDebugInfo)
                 {
@@ -268,8 +297,8 @@ namespace Geodesic
                 Debug.Log($"=== INFORMATIONS GRILLE SPHÉRIQUE ===");
                 Debug.Log($"Cellules totales: {grid.cells.Count}");
                 Debug.Log($"Cellules constructibles: {grid.cells.Count(c => c.isBuildable)}");
-                Debug.Log($"Eau: {grid.cells.Count(c => c.cellType == GeodesicSphereCell.CellType.Water)}");
-                Debug.Log($"Terre: {grid.cells.Count(c => c.cellType == GeodesicSphereCell.CellType.Land)}");
+                Debug.Log($"Eau: {grid.cells.Count(c => c.IsWater())}");
+                Debug.Log($"Terre: {grid.cells.Count(c => c.IsLand())}");
                 Debug.Log($"Pentagones: {grid.cells.Count(c => c.sides == 5)}");
                 Debug.Log($"Hexagones: {grid.cells.Count(c => c.sides == 6)}");
                 Debug.Log("=== FIN INFORMATIONS ===");
@@ -349,6 +378,29 @@ namespace Geodesic
             Debug.Log("40002 cellules (n=63)");
             Debug.Log("Custom: Fréquence personnalisée");
             Debug.Log("================================");
+        }
+        
+        [ContextMenu("Test Biomes")]
+        public void TestBiomes()
+        {
+            if (biomeGenerator != null)
+            {
+                Debug.Log("=== TEST DES BIOMES ===");
+                biomeGenerator.GenerateNewSeed();
+                biomeGenerator.GenerateBiomes();
+                Debug.Log("=== TEST TERMINÉ ===");
+            }
+            else
+            {
+                Debug.LogError("Générateur de biomes non trouvé !");
+            }
+        }
+        
+        [ContextMenu("Toggle Biomes")]
+        public void ToggleBiomes()
+        {
+            useBiomes = !useBiomes;
+            Debug.Log($"Biomes: {(useBiomes ? "Activés" : "Désactivés")}");
         }
     }
 }

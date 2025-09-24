@@ -16,9 +16,11 @@ namespace Geodesic
         
         [Header("Génération")]
         public float landRatio = 0.3f; // 30% de terre, 70% d'eau
+        public bool useBiomes = true; // Utilise le système de biomes
         
         [Header("Composants")]
         public GeodesicSphereGrid sphereGrid;
+        public GeodesicBiomeGenerator biomeGenerator;
         public Material landMaterial;
         public Material waterMaterial;
         
@@ -67,8 +69,15 @@ namespace Geodesic
             // Génère la grille
             sphereGrid.GenerateSphereGrid();
             
-            // Génère le terrain
-            GenerateTerrain();
+            // Génère le terrain (simple ou avec biomes)
+            if (useBiomes && biomeGenerator != null)
+            {
+                GenerateBiomeTerrain();
+            }
+            else
+            {
+                GenerateTerrain();
+            }
             
             // Crée les meshes
             CreatePlanetMeshes();
@@ -97,12 +106,12 @@ namespace Geodesic
                 // Détermine si c'est terre ou eau basé sur le ratio
                 if (noiseValue > landRatio)
                 {
-                    cell.cellType = GeodesicSphereCell.CellType.Land;
+                    cell.cellType = GeodesicSphereCell.CellType.Grassland;
                     cell.isBuildable = true;
                 }
                 else
                 {
-                    cell.cellType = GeodesicSphereCell.CellType.Water;
+                    cell.cellType = GeodesicSphereCell.CellType.Ocean;
                     cell.isBuildable = false;
                 }
             }
@@ -118,6 +127,30 @@ namespace Geodesic
                 Debug.Log($"- Cellules de terre: {landCells}");
                 Debug.Log($"- Cellules constructibles: {buildableCells}");
                 Debug.Log($"- Ratio terre: {(float)landCells / sphereGrid.cells.Count * 100f:F1}%");
+            }
+        }
+        
+        /// <summary>
+        /// Génère le terrain avec biomes
+        /// </summary>
+        private void GenerateBiomeTerrain()
+        {
+            if (showDebugInfo)
+            {
+                Debug.Log("Génération du terrain avec biomes...");
+            }
+            
+            // Configure le générateur de biomes
+            biomeGenerator.seed = seed;
+            biomeGenerator.landRatio = landRatio;
+            biomeGenerator.geodesicGrid = sphereGrid;
+            
+            // Génère les biomes
+            biomeGenerator.GenerateBiomes();
+            
+            if (showDebugInfo)
+            {
+                Debug.Log("Biomes générés avec succès !");
             }
         }
         
@@ -158,25 +191,19 @@ namespace Geodesic
             currentPlanetGO = new GameObject("GeodesicSpherePlanet");
             currentPlanetGO.transform.SetParent(transform, false);
             
-            // Sépare les cellules en terre et eau
-            List<GeodesicSphereCell> landCells = sphereGrid.cells.Where(c => c.IsLand()).ToList();
-            List<GeodesicSphereCell> waterCells = sphereGrid.cells.Where(c => c.IsWater()).ToList();
-            
-            // Crée le mesh de la terre
-            if (landCells.Count > 0)
+            // Crée les meshes selon le mode
+            if (useBiomes && biomeGenerator != null)
             {
-                CreateLandMesh(landCells);
+                CreateBiomeMeshes();
             }
-            
-            // Crée le mesh de l'eau
-            if (waterCells.Count > 0)
+            else
             {
-                CreateWaterMesh(waterCells);
+                CreateSimpleMeshes();
             }
             
             if (showDebugInfo)
             {
-                Debug.Log($"Meshes créés: {landCells.Count} cellules de terre, {waterCells.Count} cellules d'eau");
+                Debug.Log("Meshes créés avec succès !");
             }
         }
         
@@ -236,6 +263,125 @@ namespace Geodesic
             {
                 meshRenderer.material = CreateDefaultWaterMaterial();
             }
+        }
+        
+        /// <summary>
+        /// Crée les meshes simples (terre et eau)
+        /// </summary>
+        private void CreateSimpleMeshes()
+        {
+            List<GeodesicSphereCell> landCells = sphereGrid.cells.Where(c => c.IsLand()).ToList();
+            List<GeodesicSphereCell> waterCells = sphereGrid.cells.Where(c => c.IsWater()).ToList();
+            
+            // Crée le mesh de la terre
+            if (landCells.Count > 0)
+            {
+                CreateLandMesh(landCells);
+            }
+            
+            // Crée le mesh de l'eau
+            if (waterCells.Count > 0)
+            {
+                CreateWaterMesh(waterCells);
+            }
+            
+            if (showDebugInfo)
+            {
+                Debug.Log($"Meshes simples créés: {landCells.Count} cellules de terre, {waterCells.Count} cellules d'eau");
+            }
+        }
+        
+        /// <summary>
+        /// Crée les meshes par biome
+        /// </summary>
+        private void CreateBiomeMeshes()
+        {
+            // Groupe les cellules par biome
+            var biomeGroups = sphereGrid.cells.GroupBy(c => c.cellType).ToList();
+            
+            foreach (var group in biomeGroups)
+            {
+                GeodesicSphereCell.CellType biomeType = group.Key;
+                List<GeodesicSphereCell> cells = group.ToList();
+                
+                if (cells.Count > 0)
+                {
+                    CreateBiomeMesh(biomeType, cells);
+                }
+            }
+            
+            if (showDebugInfo)
+            {
+                Debug.Log($"Meshes de biomes créés: {biomeGroups.Count} types de biomes");
+                foreach (var group in biomeGroups)
+                {
+                    Debug.Log($"- {group.Key}: {group.Count()} cellules");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Crée un mesh pour un biome spécifique
+        /// </summary>
+        private void CreateBiomeMesh(GeodesicSphereCell.CellType biomeType, List<GeodesicSphereCell> cells)
+        {
+            GameObject biomeGO = new GameObject($"{biomeType}Mesh");
+            biomeGO.transform.SetParent(currentPlanetGO.transform, false);
+            biomeGO.tag = biomeType.ToString();
+            
+            MeshFilter meshFilter = biomeGO.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = biomeGO.AddComponent<MeshRenderer>();
+            MeshCollider meshCollider = biomeGO.AddComponent<MeshCollider>();
+            
+            // Génère le mesh
+            Mesh biomeMesh = GenerateMeshFromCells(cells);
+            meshFilter.mesh = biomeMesh;
+            meshCollider.sharedMesh = biomeMesh;
+            
+            // Assigne le matériau selon le biome
+            Material biomeMaterial = GetBiomeMaterial(biomeType);
+            meshRenderer.material = biomeMaterial;
+        }
+        
+        /// <summary>
+        /// Obtient le matériau pour un biome
+        /// </summary>
+        private Material GetBiomeMaterial(GeodesicSphereCell.CellType biomeType)
+        {
+            switch (biomeType)
+            {
+                case GeodesicSphereCell.CellType.Ocean:
+                    return waterMaterial != null ? waterMaterial : CreateDefaultWaterMaterial();
+                case GeodesicSphereCell.CellType.Lake:
+                    return CreateBiomeMaterial(Color.cyan, "Lake");
+                case GeodesicSphereCell.CellType.Coast:
+                    return CreateBiomeMaterial(new Color(0.8f, 0.8f, 0.4f), "Coast");
+                case GeodesicSphereCell.CellType.Desert:
+                    return CreateBiomeMaterial(new Color(0.9f, 0.7f, 0.3f), "Desert");
+                case GeodesicSphereCell.CellType.Grassland:
+                    return landMaterial != null ? landMaterial : CreateDefaultLandMaterial();
+                case GeodesicSphereCell.CellType.Forest:
+                    return CreateBiomeMaterial(new Color(0.2f, 0.6f, 0.2f), "Forest");
+                case GeodesicSphereCell.CellType.Mountain:
+                    return CreateBiomeMaterial(new Color(0.5f, 0.4f, 0.3f), "Mountain");
+                case GeodesicSphereCell.CellType.Tundra:
+                    return CreateBiomeMaterial(new Color(0.6f, 0.7f, 0.8f), "Tundra");
+                case GeodesicSphereCell.CellType.Ice:
+                    return CreateBiomeMaterial(new Color(0.9f, 0.9f, 1f), "Ice");
+                default:
+                    return CreateDefaultLandMaterial();
+            }
+        }
+        
+        /// <summary>
+        /// Crée un matériau pour un biome
+        /// </summary>
+        private Material CreateBiomeMaterial(Color color, string name)
+        {
+            Material material = new Material(Shader.Find("Standard"));
+            material.color = color;
+            material.name = name;
+            return material;
         }
         
         /// <summary>

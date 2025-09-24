@@ -21,10 +21,23 @@ namespace Geodesic
         public bool isBuildable;
         public bool hasStructure;
         
+        [Header("Génération Procédurale")]
+        public float altitude;        // Altitude (0-1)
+        public float temperature;     // Température (-1 à 1)
+        public float humidity;        // Humidité (0-1)
+        public float fertility;       // Fertilité (0-1)
+        
         public enum CellType
         {
-            Water,  // Eau
-            Land    // Terre
+            Ocean,      // Océan profond
+            Lake,       // Lac
+            Coast,      // Côte
+            Desert,     // Désert
+            Grassland,  // Prairie
+            Forest,     // Forêt
+            Mountain,   // Montagne
+            Tundra,     // Toundra
+            Ice         // Glace
         }
         
         public GeodesicSphereCell(int id, Vector3 centerPosition, Vector3[] vertices)
@@ -34,9 +47,13 @@ namespace Geodesic
             this.vertices = vertices;
             this.sides = vertices.Length;
             this.neighborIds = new List<int>();
-            this.cellType = CellType.Water;
+            this.cellType = CellType.Ocean;
             this.isBuildable = false;
             this.hasStructure = false;
+            this.altitude = 0f;
+            this.temperature = 0f;
+            this.humidity = 0f;
+            this.fertility = 0f;
         }
         
         /// <summary>
@@ -52,7 +69,7 @@ namespace Geodesic
         /// </summary>
         public bool IsLand()
         {
-            return cellType == CellType.Land;
+            return cellType != CellType.Ocean && cellType != CellType.Lake;
         }
         
         /// <summary>
@@ -60,7 +77,15 @@ namespace Geodesic
         /// </summary>
         public bool IsWater()
         {
-            return cellType == CellType.Water;
+            return cellType == CellType.Ocean || cellType == CellType.Lake;
+        }
+        
+        /// <summary>
+        /// Vérifie si la cellule est constructible
+        /// </summary>
+        public bool CanBuild()
+        {
+            return IsLand() && isBuildable && !hasStructure;
         }
         
         /// <summary>
@@ -70,8 +95,15 @@ namespace Geodesic
         {
             switch (cellType)
             {
-                case CellType.Water: return Color.blue;
-                case CellType.Land: return Color.green;
+                case CellType.Ocean: return new Color(0f, 0.2f, 0.8f);      // Bleu océan
+                case CellType.Lake: return new Color(0.2f, 0.4f, 1f);       // Bleu lac
+                case CellType.Coast: return new Color(0.8f, 0.8f, 0.4f);    // Jaune sable
+                case CellType.Desert: return new Color(0.9f, 0.7f, 0.3f);   // Jaune désert
+                case CellType.Grassland: return new Color(0.4f, 0.8f, 0.2f); // Vert prairie
+                case CellType.Forest: return new Color(0.2f, 0.6f, 0.2f);   // Vert forêt
+                case CellType.Mountain: return new Color(0.5f, 0.4f, 0.3f);  // Brun montagne
+                case CellType.Tundra: return new Color(0.6f, 0.7f, 0.8f);   // Gris toundra
+                case CellType.Ice: return new Color(0.9f, 0.9f, 1f);        // Blanc glace
                 default: return Color.magenta;
             }
         }
