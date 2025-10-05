@@ -2,9 +2,9 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Système de tuiles hexagonales individuelles comme RimWorld
+/// Version corrigée des tuiles hexagonales - une seule sphère, vrais hexagones
 /// </summary>
-public class PlanetHexTiles : MonoBehaviour
+public class PlanetHexTilesCorrected : MonoBehaviour
 {
     [Header("Configuration Tuiles")]
     public int frequency = 7;
@@ -14,16 +14,12 @@ public class PlanetHexTiles : MonoBehaviour
     public bool showDebugInfo = true;
 
     [Header("Tuiles")]
-    public float tileSize = 1f; // Taille d'une tuile hexagonale
     public Material landMaterial;
     public Material waterMaterial;
     public Material buildableMaterial;
 
     [Header("Composants")]
     public PlanetHexWorld hexWorld;
-    public PlanetTileSelector tileSelector;
-
-    [Header("Données")]
     public List<GameObject> tileObjects = new List<GameObject>();
     public Transform tilesParent;
 
@@ -31,14 +27,14 @@ public class PlanetHexTiles : MonoBehaviour
     {
         if (showDebugInfo)
         {
-            Debug.Log("=== DÉBUT SYSTÈME TUILES HEXAGONALES ===");
+            Debug.Log("=== DÉBUT TUILES HEXAGONALES CORRIGÉES ===");
         }
         
         CreateHexTiles();
     }
 
     /// <summary>
-    /// Crée les tuiles hexagonales individuelles
+    /// Crée les tuiles hexagonales
     /// </summary>
     [ContextMenu("Créer Tuiles Hexagonales")]
     public void CreateHexTiles()
@@ -97,7 +93,7 @@ public class PlanetHexTiles : MonoBehaviour
         hexWorld.buildLatitudeDeg = buildLatitudeDeg;
         hexWorld.excludePentagonsFromBuild = true;
         hexWorld.generateOnStart = false;
-        hexWorld.drawGizmos = false; // Pas de gizmos !
+        hexWorld.drawGizmos = false; // IMPORTANT: Pas de gizmos pour éviter la double sphère
 
         // Génère la grille
         hexWorld.Generate();
@@ -129,8 +125,8 @@ public class PlanetHexTiles : MonoBehaviour
         tileGO.transform.SetParent(tilesParent);
         tileGO.transform.position = cell.center;
 
-        // Crée le mesh hexagonal
-        Mesh hexMesh = CreateHexMesh(cell);
+        // Crée le mesh hexagonal VRAIMENT hexagonal
+        Mesh hexMesh = CreateTrueHexMesh(cell);
         
         // Ajoute les composants
         MeshFilter meshFilter = tileGO.AddComponent<MeshFilter>();
@@ -145,88 +141,55 @@ public class PlanetHexTiles : MonoBehaviour
         Material tileMaterial = GetTileMaterial(cell);
         meshRenderer.material = tileMaterial;
 
-        // Ajoute un tag pour la sélection
-        if (cell.canBuild)
-        {
-            tileGO.tag = "BuildableTile";
-        }
-        else if (cell.isPentagon)
-        {
-            tileGO.tag = "PentagonTile";
-        }
-        else
-        {
-            tileGO.tag = "HexTile";
-        }
-
         // Stocke la référence
         tileObjects.Add(tileGO);
     }
 
     /// <summary>
-    /// Crée le mesh hexagonal pour une cellule
+    /// Crée un mesh hexagonal VRAIMENT hexagonal
     /// </summary>
-    private Mesh CreateHexMesh(PlanetHexWorld.Cell cell)
+    private Mesh CreateTrueHexMesh(PlanetHexWorld.Cell cell)
     {
         Mesh mesh = new Mesh();
         
-        // Calcule les sommets du hexagone projetés sur la sphère
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
         List<Vector3> normals = new List<Vector3>();
 
-        // Centre de la cellule sur la sphère
+        // Centre de la cellule
         Vector3 center = cell.center;
         vertices.Add(center);
         normals.Add(center.normalized);
 
-        // Calcule les voisins pour créer un hexagone/pentagone
-        List<Vector3> neighborPositions = new List<Vector3>();
+        // Crée un hexagone VRAIMENT hexagonal
+        int hexSides = cell.isPentagon ? 5 : 6;
+        float hexRadius = 0.08f; // Taille de l'hexagone
         
-        // Si on a des voisins, utilise leurs positions
-        if (cell.neighbors != null && cell.neighbors.Count > 0)
+        for (int i = 0; i < hexSides; i++)
         {
-            foreach (int neighborId in cell.neighbors)
+            float angle = (i * 2f * Mathf.PI) / hexSides;
+            
+            // Crée un hexagone dans le plan tangent à la sphère
+            Vector3 tangent1 = Vector3.Cross(center, Vector3.up).normalized;
+            if (tangent1.magnitude < 0.1f)
             {
-                if (neighborId < hexWorld.cells.Count)
-                {
-                    var neighbor = hexWorld.cells[neighborId];
-                    neighborPositions.Add(neighbor.center);
-                }
+                tangent1 = Vector3.Cross(center, Vector3.right).normalized;
             }
-        }
-        
-        // Si pas de voisins, crée un hexagone basique
-        if (neighborPositions.Count == 0)
-        {
-            int hexSides = cell.isPentagon ? 5 : 6;
-            for (int i = 0; i < hexSides; i++)
-            {
-                float angle = (i * 2f * Mathf.PI) / hexSides;
-                // Crée un hexagone dans le plan tangent à la sphère
-                Vector3 tangent1 = Vector3.Cross(center, Vector3.up).normalized;
-                Vector3 tangent2 = Vector3.Cross(center, tangent1).normalized;
-                
-                Vector3 offset = (tangent1 * Mathf.Cos(angle) + tangent2 * Mathf.Sin(angle)) * tileSize;
-                Vector3 vertex = (center + offset).normalized * radius;
-                neighborPositions.Add(vertex);
-            }
-        }
-
-        // Ajoute les sommets des voisins
-        foreach (Vector3 neighborPos in neighborPositions)
-        {
-            vertices.Add(neighborPos);
-            normals.Add(neighborPos.normalized);
+            Vector3 tangent2 = Vector3.Cross(center, tangent1).normalized;
+            
+            // Crée le point du périmètre avec une forme hexagonale claire
+            Vector3 offset = (tangent1 * Mathf.Cos(angle) + tangent2 * Mathf.Sin(angle)) * hexRadius;
+            Vector3 perimeterPoint = center + offset;
+            vertices.Add(perimeterPoint);
+            normals.Add(perimeterPoint.normalized);
         }
 
         // Crée les triangles (fan triangulation depuis le centre)
-        int triangleSides = neighborPositions.Count;
-        for (int i = 0; i < triangleSides; i++)
+        for (int i = 0; i < hexSides; i++)
         {
             triangles.Add(0); // Centre
             triangles.Add(i + 1);
-            triangles.Add(((i + 1) % triangleSides) + 1);
+            triangles.Add(((i + 1) % hexSides) + 1);
         }
 
         // Assigne les données au mesh
