@@ -13,9 +13,9 @@ namespace HexasphereProcedural {
         
         [Header("📷 Configuration Caméra")]
         [SerializeField] public float rotationSpeed = 2f;
-        [SerializeField] public float zoomSpeed = 2f;
-        [SerializeField] public float minDistance = 1.5f;
-        [SerializeField] public float maxDistance = 10f;
+        [SerializeField] public float zoomSpeed = 20f;
+        [SerializeField] public float minDistance = 0.5f;
+        [SerializeField] public float maxDistance = 500f;
         [SerializeField] public float defaultDistance = 3f;
         
         [Header("🔄 Rotation")]

@@ -638,6 +638,59 @@ LightingSettings:
   m_PVRFilteringAtrousPositionSigmaIndirect: 2
   m_PVRFilteringAtrousPositionSigmaAO: 1
   m_RespectSceneVisibilityWhenBakingGI: 0
+--- !u!1 &1129399815
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1129399817}
+  - component: {fileID: 1129399816}
+  m_Layer: 0
+  m_Name: HexaTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1129399816
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129399815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 407f2602afdcf334389b3d904dd8b8ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  divisions: 3
+  radius: 1
+  generateOnStart: 1
+  showDebugInfo: 1
+  showWireframe: 0
+  fixTriangleOrientation: 1
+  useSphericalUVs: 1
+  hexagonMaterial: {fileID: 2100000, guid: a0a9fe1ad2a821d42aafb9412a87d1bb, type: 2}
+  hexagonColor: {r: 0, g: 0, b: 1, a: 1}
+--- !u!4 &1129399817
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129399815}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.16, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1559964992
 GameObject:
   m_ObjectHideFlags: 0
@@ -800,9 +853,9 @@ MonoBehaviour:
   targetPlanet: {fileID: 0}
   autoFindPlanet: 1
   rotationSpeed: 2
-  zoomSpeed: 2
+  zoomSpeed: 10.33
   minDistance: 1
-  maxDistance: 10
+  maxDistance: 311.3
   defaultDistance: 5
   keepNorthUp: 1
   smoothRotation: 5
@@ -818,6 +871,10 @@ MonoBehaviour:
   animationDuration: 1
   acceptableDistanceRange: 2
   showDebugInfo: 0
+  currentRotation: {x: 0, y: 0, z: 0}
+  currentDistance: 0
+  targetRotation: {x: 0, y: 0, z: 0}
+  targetDistance: 0
 --- !u!1 &1652394923
 GameObject:
   m_ObjectHideFlags: 0
@@ -829,7 +886,7 @@ GameObject:
   - component: {fileID: 1652394925}
   - component: {fileID: 1652394943}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: AstraHexa
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -844,7 +901,7 @@ Transform:
   m_GameObject: {fileID: 1652394923}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.08494571, y: 0.016374147, z: 0.14213037}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -890,6 +947,51 @@ MonoBehaviour:
   ridgeIntensity: 0.33
   useFlatOceans: 1
   forceOceanLevel: 1
+  enableLOD: 1
+  cameraTransform: {fileID: 0}
+  lodUpdateInterval: 0.1
+  lod0Distance: 10
+  lod1Distance: 25
+  lod2Distance: 50
+  lod3Distance: 100
+  cullDistance: 200
+  lod0Divisions: 4
+  lod1Divisions: 3
+  lod2Divisions: 2
+  lod3Divisions: 1
+  enableBoundaryLOD: 1
+  boundaryDetectionRadius: 2
+  boundarySubdivisionLevel: 2
+  detectWaterLandBoundaries: 1
+  detectMountainBoundaries: 1
+  enableTransitionSmoothing: 1
+  transitionWidth: 1
+  transitionSubdivisions: 3
+  smoothWaterLandTransitions: 1
+  smoothMountainTransitions: 1
+  preserveOceanStructure: 1
+  oceanStructureStrength: 0.5
+  useAdvancedOceanSystem: 1
+  preserveBaseShape: 1
+  oceanFlatteningStrength: 1
+  useAdaptiveSubdivision: 1
+  maxSafeDivisions: 5
+  useChunkedGeneration: 1
+  chunkSize: 1000
+  useTriangularSubdivision: 1
+  maxTriangularDivisions: 20
+  useSimpleEdgeSubdivision: 0
+  maxVerticesLimit: 200000
+  useSmartLimits: 1
+  useHexasphereSubdivision: 1
+  hexasphereMaxDivisions: 10
+  useSafeMode: 1
+  useIntelligentSubdivision: 1
+  maxIntelligentDivisions: 8
+  subdivisionQuality: 0.8
+  useHexagonSubdivision: 1
+  hexagonMaxDivisions: 15
+  useHexagonRows: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -900,3 +1002,4 @@ SceneRoots:
   - {fileID: 898969038}
   - {fileID: 993790995}
   - {fileID: 896646341}
+  - {fileID: 1129399817}

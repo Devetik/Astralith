@@ -87,6 +87,36 @@ namespace HexasphereProcedural {
         [SerializeField] public bool preserveBaseShape = true;
         [SerializeField] public float oceanFlatteningStrength = 1f;
         
+        [Header("⚡ Optimisation Haute Résolution")]
+        [SerializeField] public bool useAdaptiveSubdivision = true;
+        [SerializeField] public int maxSafeDivisions = 5;
+        [SerializeField] public bool useChunkedGeneration = true;
+        [SerializeField] public int chunkSize = 1000;
+        
+        [Header("🔺 Subdivision Alternative")]
+        [SerializeField] public bool useTriangularSubdivision = true;
+        [SerializeField] public int maxTriangularDivisions = 20;
+        [SerializeField] public bool useSimpleEdgeSubdivision = false;
+        
+        [Header("🛡️ Limites de Sécurité")]
+        [SerializeField] public int maxVerticesLimit = 200000;
+        [SerializeField] public bool useSmartLimits = true;
+        
+        [Header("🔺 Subdivision Hexasphere")]
+        [SerializeField] public bool useHexasphereSubdivision = false; // Désactivé par défaut pour éviter les crashes
+        [SerializeField] public int hexasphereMaxDivisions = 10;
+        [SerializeField] public bool useSafeMode = true; // Mode sécurisé par défaut
+        
+        [Header("🎯 Subdivision Intelligente")]
+        [SerializeField] public bool useIntelligentSubdivision = true;
+        [SerializeField] public int maxIntelligentDivisions = 8;
+        [SerializeField] public float subdivisionQuality = 0.8f; // 0.0 = très basse qualité, 1.0 = haute qualité
+        
+        [Header("🔷 Subdivision Hexagone")]
+        [SerializeField] public bool useHexagonSubdivision = false; // Désactivé par défaut pour éviter les crashes
+        [SerializeField] public int hexagonMaxDivisions = 8; // Limite réduite
+        [SerializeField] public bool useHexagonRows = true; // Ajouter des rangées d'hexagones
+        
         private MeshRenderer meshRenderer;
         private MeshFilter meshFilter;
         
@@ -187,11 +217,635 @@ namespace HexasphereProcedural {
             List<Vector3> baseVertices = CreateIcosahedronVertices();
             List<int> baseTriangles = CreateIcosahedronTriangles();
             
-            // Subdiviser
-            for (int division = 0; division < divisions; division++) {
+            // Choisir la méthode de subdivision (priorité à la subdivision intelligente)
+            if (useIntelligentSubdivision && divisions > maxSafeDivisions) {
+                Debug.Log($"🎯 Utilisation de la subdivision intelligente pour {divisions} divisions");
+                CreateIntelligentSubdivision(baseVertices, baseTriangles, divisions);
+            } else if (useHexagonSubdivision && divisions > maxSafeDivisions) {
+                Debug.Log($"🔷 Utilisation de la subdivision hexagone pour {divisions} divisions");
+                CreateHexagonSubdivision(baseVertices, baseTriangles, divisions);
+            } else if (useHexasphereSubdivision && !useSafeMode && divisions > maxSafeDivisions) {
+                Debug.Log($"🔺 Utilisation de la subdivision Hexasphere pour {divisions} divisions");
+                CreateHexasphereSubdivision(baseVertices, baseTriangles, divisions);
+            } else {
+                // Subdivision classique avec limites de sécurité intelligentes
+                Debug.Log($"🔧 Génération de {divisions} divisions avec subdivision classique contrôlée");
+                
+                // Calculer le nombre de vertices attendu pour cette division
+                int expectedVertices = CalculateExpectedVertices(divisions);
+                
+                if (expectedVertices > maxVerticesLimit) {
+                    Debug.LogWarning($"⚠️ Trop de vertices attendus ({expectedVertices:N0}). Limitation à {maxVerticesLimit:N0} vertices.");
+                }
+                
+                for (int division = 0; division < divisions; division++) {
+                    // Vérifier la limite avant chaque subdivision
+                    if (baseVertices.Count > maxVerticesLimit) {
+                        Debug.LogWarning($"⚠️ Limite de vertices atteinte à la division {division}. Arrêt de la subdivision.");
+                        break;
+                    }
+                    
+                    // Vérification intelligente si activée
+                    if (useSmartLimits) {
+                        // Vérifier si la prochaine subdivision dépassera la limite
+                        int nextVertices = baseVertices.Count * 4; // Chaque division multiplie par ~4
+                        if (nextVertices > maxVerticesLimit) {
+                            Debug.LogWarning($"⚠️ Prochaine subdivision dépasserait la limite. Arrêt à la division {division}.");
+                            break;
+                        }
+                    }
+                    
+                    SubdivideSphere(baseVertices, baseTriangles);
+                    Debug.Log($"📊 Division {division}: {baseVertices.Count} vertices, {baseTriangles.Count/3} triangles");
+                }
+            }
+            
+            // Appliquer les hauteurs et créer le mesh final
+            ApplyHeightsToMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
+            
+            // Vérification du mesh généré
+            Debug.Log($"✅ Mesh généré: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            if (vertices.Count == 0) {
+                Debug.LogError("❌ ERREUR: Aucun vertex généré !");
+            }
+            if (triangles.Count == 0) {
+                Debug.LogError("❌ ERREUR: Aucun triangle généré !");
+            }
+        }
+        
+        // === MÉTHODES DE SUBDIVISION HEXAGONE ===
+        
+        void CreateHexagonSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
+            Debug.Log($"🔷 Début subdivision hexagone pour {targetDivisions} divisions");
+            
+            // Subdivision classique jusqu'à la limite sûre
+            int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
+            for (int division = 0; division < safeDivisions; division++) {
+                SubdivideSphere(vertices, triangles);
+                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            }
+            
+            // Subdivision hexagone pour les divisions restantes
+            int remainingDivisions = targetDivisions - safeDivisions;
+            if (remainingDivisions > 0) {
+                Debug.Log($"🔷 Subdivision hexagone pour {remainingDivisions} divisions restantes");
+                for (int i = 0; i < remainingDivisions; i++) {
+                    // Vérifications de sécurité strictes
+                    if (vertices.Count > 50000) {
+                        Debug.LogWarning($"⚠️ Limite de vertices atteinte dans hexagone. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    if (triangles.Count > 200000) {
+                        Debug.LogWarning($"⚠️ Limite de triangles atteinte dans hexagone. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    // Vérifier si on peut continuer sans crash
+                    int expectedVertices = vertices.Count * 4;
+                    int expectedTriangles = triangles.Count * 4;
+                    
+                    if (expectedVertices > 100000 || expectedTriangles > 400000) {
+                        Debug.LogWarning($"⚠️ Prochaine subdivision dépasserait les limites. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    SubdivideHexagonStyle(vertices, triangles);
+                    Debug.Log($"📊 Division hexagone {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+                }
+            }
+        }
+        
+        void SubdivideHexagonStyle(List<Vector3> vertices, List<int> triangles) {
+            // Approche simplifiée : subdivision classique mais contrôlée
+            Debug.Log($"🔷 Subdivision hexagone simplifiée pour {triangles.Count/3} triangles");
+            
+            // Créer une nouvelle liste de triangles
+            List<int> newTriangles = new List<int>();
+            
+            // Pour chaque triangle, appliquer une subdivision simple
+            for (int i = 0; i < triangles.Count; i += 3) {
+                int v1 = triangles[i];
+                int v2 = triangles[i + 1];
+                int v3 = triangles[i + 2];
+                
+                // Vérifier les indices
+                if (v1 >= vertices.Count || v2 >= vertices.Count || v3 >= vertices.Count) {
+                    Debug.LogError($"❌ Indice de vertex hors limites: v1={v1}, v2={v2}, v3={v3}, vertices.Count={vertices.Count}");
+                    continue;
+                }
+                
+                // Subdivision simple : diviser chaque triangle en 4 (comme subdivision classique)
+                Vector3 mid12 = ((vertices[v1] + vertices[v2]) / 2f).normalized;
+                Vector3 mid23 = ((vertices[v2] + vertices[v3]) / 2f).normalized;
+                Vector3 mid31 = ((vertices[v3] + vertices[v1]) / 2f).normalized;
+                
+                // Ajouter les nouveaux vertices
+                int mid12Index = vertices.Count;
+                vertices.Add(mid12);
+                int mid23Index = vertices.Count;
+                vertices.Add(mid23);
+                int mid31Index = vertices.Count;
+                vertices.Add(mid31);
+                
+                // Créer 4 triangles
+                newTriangles.Add(v1);
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid31Index);
+                
+                newTriangles.Add(v2);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid12Index);
+                
+                newTriangles.Add(v3);
+                newTriangles.Add(mid31Index);
+                newTriangles.Add(mid23Index);
+                
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid31Index);
+            }
+            
+            // Remplacer les anciens triangles par les nouveaux
+            triangles.Clear();
+            triangles.AddRange(newTriangles);
+            
+            Debug.Log($"🔷 Subdivision hexagone terminée: {vertices.Count} vertices, {triangles.Count/3} triangles");
+        }
+        
+        List<Vector3> SubdivideEdgeHexagon(Vector3 start, Vector3 end, int segments) {
+            List<Vector3> points = new List<Vector3>();
+            points.Add(start);
+            
+            for (int i = 1; i < segments; i++) {
+                float t = (float)i / segments;
+                Vector3 point = Vector3.Lerp(start, end, t);
+                point = point.normalized; // Normaliser pour maintenir la forme sphérique
+                points.Add(point);
+            }
+            
+            points.Add(end);
+            return points;
+        }
+        
+        void CreateTriangleFromVertices(Vector3 p1, Vector3 p2, Vector3 p3, List<Vector3> vertices, List<int> triangles) {
+            // Ajouter les vertices s'ils n'existent pas déjà
+            int i1 = GetOrAddVertexHexagon(p1, vertices);
+            int i2 = GetOrAddVertexHexagon(p2, vertices);
+            int i3 = GetOrAddVertexHexagon(p3, vertices);
+            
+            // Ajouter le triangle
+            triangles.Add(i1);
+            triangles.Add(i2);
+            triangles.Add(i3);
+        }
+        
+        int GetOrAddVertexHexagon(Vector3 vertex, List<Vector3> vertices) {
+            // Chercher un vertex existant avec une tolérance plus stricte
+            float tolerance = 0.0001f;
+            for (int i = 0; i < vertices.Count; i++) {
+                if (Vector3.Distance(vertices[i], vertex) < tolerance) {
+                    return i;
+                }
+            }
+            
+            // Ajouter un nouveau vertex
+            vertices.Add(vertex);
+            return vertices.Count - 1;
+        }
+        
+        // === MÉTHODES DE SUBDIVISION INTELLIGENTE ===
+        
+        void CreateIntelligentSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
+            Debug.Log($"🎯 Début subdivision intelligente pour {targetDivisions} divisions");
+            
+            // Subdivision classique jusqu'à la limite sûre
+            int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
+            for (int division = 0; division < safeDivisions; division++) {
+                SubdivideSphere(vertices, triangles);
+                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            }
+            
+            // Subdivision intelligente pour les divisions restantes
+            int remainingDivisions = targetDivisions - safeDivisions;
+            if (remainingDivisions > 0) {
+                Debug.Log($"🎯 Subdivision intelligente pour {remainingDivisions} divisions restantes");
+                for (int i = 0; i < remainingDivisions; i++) {
+                    // Limite de sécurité basée sur la qualité
+                    int qualityLimit = Mathf.RoundToInt(maxVerticesLimit * subdivisionQuality);
+                    if (vertices.Count > qualityLimit) {
+                        Debug.LogWarning($"⚠️ Limite de qualité atteinte. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    SubdivideIntelligent(vertices, triangles);
+                    Debug.Log($"📊 Division intelligente {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+                }
+            }
+        }
+        
+        void SubdivideIntelligent(List<Vector3> vertices, List<int> triangles) {
+            // Créer une nouvelle liste de triangles
+            List<int> newTriangles = new List<int>();
+            
+            // Pour chaque triangle, appliquer une subdivision intelligente
+            for (int i = 0; i < triangles.Count; i += 3) {
+                int v1 = triangles[i];
+                int v2 = triangles[i + 1];
+                int v3 = triangles[i + 2];
+                
+                // Vérifier les indices
+                if (v1 >= vertices.Count || v2 >= vertices.Count || v3 >= vertices.Count) {
+                    Debug.LogError($"❌ Indice de vertex hors limites: v1={v1}, v2={v2}, v3={v3}, vertices.Count={vertices.Count}");
+                    continue;
+                }
+                
+                // Calculer la taille du triangle pour décider de la subdivision
+                float triangleSize = CalculateTriangleSize(vertices[v1], vertices[v2], vertices[v3]);
+                
+                if (triangleSize > 0.1f) { // Seulement subdiviser les gros triangles
+                    // Subdivision classique mais contrôlée
+                    Vector3 mid12 = ((vertices[v1] + vertices[v2]) / 2f).normalized;
+                    Vector3 mid23 = ((vertices[v2] + vertices[v3]) / 2f).normalized;
+                    Vector3 mid31 = ((vertices[v3] + vertices[v1]) / 2f).normalized;
+                    
+                    // Ajouter les nouveaux vertices
+                    int mid12Index = vertices.Count;
+                    vertices.Add(mid12);
+                    int mid23Index = vertices.Count;
+                    vertices.Add(mid23);
+                    int mid31Index = vertices.Count;
+                    vertices.Add(mid31);
+                    
+                    // Créer 4 triangles
+                    newTriangles.Add(v1);
+                    newTriangles.Add(mid12Index);
+                    newTriangles.Add(mid31Index);
+                    
+                    newTriangles.Add(v2);
+                    newTriangles.Add(mid23Index);
+                    newTriangles.Add(mid12Index);
+                    
+                    newTriangles.Add(v3);
+                    newTriangles.Add(mid31Index);
+                    newTriangles.Add(mid23Index);
+                    
+                    newTriangles.Add(mid12Index);
+                    newTriangles.Add(mid23Index);
+                    newTriangles.Add(mid31Index);
+                } else {
+                    // Triangle trop petit, le garder tel quel
+                    newTriangles.Add(v1);
+                    newTriangles.Add(v2);
+                    newTriangles.Add(v3);
+                }
+            }
+            
+            // Remplacer les anciens triangles par les nouveaux
+            triangles.Clear();
+            triangles.AddRange(newTriangles);
+        }
+        
+        float CalculateTriangleSize(Vector3 p1, Vector3 p2, Vector3 p3) {
+            // Calculer l'aire du triangle
+            Vector3 v1 = p2 - p1;
+            Vector3 v2 = p3 - p1;
+            float area = Vector3.Cross(v1, v2).magnitude * 0.5f;
+            return area;
+        }
+        
+        // === MÉTHODES DE SUBDIVISION HEXASPHERE ===
+        
+        void CreateHexasphereSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
+            Debug.Log($"🔺 Début subdivision Hexasphere pour {targetDivisions} divisions");
+            
+            // Subdivision classique jusqu'à la limite sûre
+            int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
+            for (int division = 0; division < safeDivisions; division++) {
+                SubdivideSphere(vertices, triangles);
+                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            }
+            
+            // Subdivision Hexasphere pour les divisions restantes
+            int remainingDivisions = targetDivisions - safeDivisions;
+            if (remainingDivisions > 0) {
+                Debug.Log($"🔺 Subdivision Hexasphere pour {remainingDivisions} divisions restantes");
+                for (int i = 0; i < remainingDivisions; i++) {
+                    // Limite de sécurité stricte
+                    if (vertices.Count > 50000) {
+                        Debug.LogWarning($"⚠️ Limite de vertices atteinte dans Hexasphere. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    if (triangles.Count > 100000) {
+                        Debug.LogWarning($"⚠️ Limite de triangles atteinte dans Hexasphere. Arrêt à la division {i}.");
+                        break;
+                    }
+                    
+                    SubdivideHexasphereStyle(vertices, triangles);
+                    Debug.Log($"📊 Division Hexasphere {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+                }
+            }
+        }
+        
+        void SubdivideHexasphereStyle(List<Vector3> vertices, List<int> triangles) {
+            // Créer une nouvelle liste de triangles
+            List<int> newTriangles = new List<int>();
+            
+            // Pour chaque triangle, appliquer une subdivision simple mais contrôlée
+            for (int i = 0; i < triangles.Count; i += 3) {
+                int v1 = triangles[i];
+                int v2 = triangles[i + 1];
+                int v3 = triangles[i + 2];
+                
+                // Vérifier les indices
+                if (v1 >= vertices.Count || v2 >= vertices.Count || v3 >= vertices.Count) {
+                    Debug.LogError($"❌ Indice de vertex hors limites: v1={v1}, v2={v2}, v3={v3}, vertices.Count={vertices.Count}");
+                    continue;
+                }
+                
+                // Subdivision simple : diviser chaque arête en 2 segments
+                Vector3 mid12 = ((vertices[v1] + vertices[v2]) / 2f).normalized;
+                Vector3 mid23 = ((vertices[v2] + vertices[v3]) / 2f).normalized;
+                Vector3 mid31 = ((vertices[v3] + vertices[v1]) / 2f).normalized;
+                
+                // Ajouter les nouveaux vertices
+                int mid12Index = vertices.Count;
+                vertices.Add(mid12);
+                int mid23Index = vertices.Count;
+                vertices.Add(mid23);
+                int mid31Index = vertices.Count;
+                vertices.Add(mid31);
+                
+                // Créer 4 triangles (subdivision classique mais contrôlée)
+                newTriangles.Add(v1);
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid31Index);
+                
+                newTriangles.Add(v2);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid12Index);
+                
+                newTriangles.Add(v3);
+                newTriangles.Add(mid31Index);
+                newTriangles.Add(mid23Index);
+                
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid31Index);
+            }
+            
+            // Remplacer les anciens triangles par les nouveaux
+            triangles.Clear();
+            triangles.AddRange(newTriangles);
+        }
+        
+        List<Vector3> SubdivideEdge(Vector3 start, Vector3 end, int segments) {
+            List<Vector3> points = new List<Vector3>();
+            points.Add(start);
+            
+            for (int i = 1; i < segments; i++) {
+                float t = (float)i / segments;
+                Vector3 point = Vector3.Lerp(start, end, t);
+                point = point.normalized; // Normaliser pour maintenir la forme sphérique
+                points.Add(point);
+            }
+            
+            points.Add(end);
+            return points;
+        }
+        
+        void CreateTriangleFromPoints(Vector3 p1, Vector3 p2, Vector3 p3, List<Vector3> vertices, List<int> triangles) {
+            // Ajouter les vertices s'ils n'existent pas déjà
+            int i1 = GetOrAddVertex(p1, vertices);
+            int i2 = GetOrAddVertex(p2, vertices);
+            int i3 = GetOrAddVertex(p3, vertices);
+            
+            // Ajouter le triangle
+            triangles.Add(i1);
+            triangles.Add(i2);
+            triangles.Add(i3);
+        }
+        
+        int GetOrAddVertex(Vector3 vertex, List<Vector3> vertices) {
+            // Chercher un vertex existant avec une tolérance
+            float tolerance = 0.001f;
+            for (int i = 0; i < vertices.Count; i++) {
+                if (Vector3.Distance(vertices[i], vertex) < tolerance) {
+                    return i;
+                }
+            }
+            
+            // Ajouter un nouveau vertex
+            vertices.Add(vertex);
+            return vertices.Count - 1;
+        }
+        
+        // === MÉTHODES DE SUBDIVISION SIMPLE ===
+        
+        void CreateSimpleEdgeSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
+            Debug.Log($"🔺 Début subdivision simple par arêtes pour {targetDivisions} divisions");
+            
+            // Subdivision classique jusqu'à la limite sûre
+            int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
+            for (int division = 0; division < safeDivisions; division++) {
+                SubdivideSphere(vertices, triangles);
+                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            }
+            
+            // Subdivision simple pour les divisions restantes
+            int remainingDivisions = targetDivisions - safeDivisions;
+            if (remainingDivisions > 0) {
+                Debug.Log($"🔺 Subdivision simple pour {remainingDivisions} divisions restantes");
+                for (int i = 0; i < remainingDivisions; i++) {
+                    SubdivideSimple(vertices, triangles);
+                    Debug.Log($"📊 Division simple {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+                }
+            }
+        }
+        
+        void SubdivideSimple(List<Vector3> vertices, List<int> triangles) {
+            // Créer une nouvelle liste de triangles
+            List<int> newTriangles = new List<int>();
+            
+            // Pour chaque triangle, ajouter un vertex au milieu de chaque arête
+            for (int i = 0; i < triangles.Count; i += 3) {
+                int v1 = triangles[i];
+                int v2 = triangles[i + 1];
+                int v3 = triangles[i + 2];
+                
+                // Calculer les milieux des arêtes
+                Vector3 mid12 = ((vertices[v1] + vertices[v2]) / 2f).normalized;
+                Vector3 mid23 = ((vertices[v2] + vertices[v3]) / 2f).normalized;
+                Vector3 mid31 = ((vertices[v3] + vertices[v1]) / 2f).normalized;
+                
+                // Ajouter les nouveaux vertices
+                int mid12Index = vertices.Count;
+                vertices.Add(mid12);
+                int mid23Index = vertices.Count;
+                vertices.Add(mid23);
+                int mid31Index = vertices.Count;
+                vertices.Add(mid31);
+                
+                // Créer 4 nouveaux triangles (subdivision classique mais contrôlée)
+                newTriangles.Add(v1);
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid31Index);
+                
+                newTriangles.Add(v2);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid12Index);
+                
+                newTriangles.Add(v3);
+                newTriangles.Add(mid31Index);
+                newTriangles.Add(mid23Index);
+                
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid31Index);
+            }
+            
+            // Remplacer les anciens triangles par les nouveaux
+            triangles.Clear();
+            triangles.AddRange(newTriangles);
+        }
+        
+        // === MÉTHODES DE SUBDIVISION TRIANGULAIRE ===
+        
+        void CreateTriangularSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
+            Debug.Log($"🔺 Début subdivision triangulaire pour {targetDivisions} divisions");
+            
+            // Subdivision classique jusqu'à la limite sûre
+            int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
+            for (int division = 0; division < safeDivisions; division++) {
+                SubdivideSphere(vertices, triangles);
+                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+            }
+            
+            // Subdivision triangulaire pour les divisions restantes
+            int remainingDivisions = targetDivisions - safeDivisions;
+            if (remainingDivisions > 0) {
+                Debug.Log($"🔺 Subdivision triangulaire pour {remainingDivisions} divisions restantes");
+                for (int i = 0; i < remainingDivisions; i++) {
+                    SubdivideTriangular(vertices, triangles);
+                    Debug.Log($"📊 Division triangulaire {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
+                }
+            }
+        }
+        
+        void SubdivideTriangular(List<Vector3> vertices, List<int> triangles) {
+            // Créer une nouvelle liste de triangles
+            List<int> newTriangles = new List<int>();
+            
+            // Pour chaque triangle existant, le diviser en 4 triangles plus équilibrés
+            for (int i = 0; i < triangles.Count; i += 3) {
+                int v1 = triangles[i];
+                int v2 = triangles[i + 1];
+                int v3 = triangles[i + 2];
+                
+                // Calculer les milieux des arêtes
+                Vector3 mid12 = ((vertices[v1] + vertices[v2]) / 2f).normalized;
+                Vector3 mid23 = ((vertices[v2] + vertices[v3]) / 2f).normalized;
+                Vector3 mid31 = ((vertices[v3] + vertices[v1]) / 2f).normalized;
+                
+                // Ajouter les nouveaux vertices
+                int mid12Index = vertices.Count;
+                vertices.Add(mid12);
+                int mid23Index = vertices.Count;
+                vertices.Add(mid23);
+                int mid31Index = vertices.Count;
+                vertices.Add(mid31);
+                
+                // Créer 4 nouveaux triangles plus équilibrés
+                // Triangle central
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid31Index);
+                
+                // Triangle 1
+                newTriangles.Add(v1);
+                newTriangles.Add(mid12Index);
+                newTriangles.Add(mid31Index);
+                
+                // Triangle 2
+                newTriangles.Add(v2);
+                newTriangles.Add(mid23Index);
+                newTriangles.Add(mid12Index);
+                
+                // Triangle 3
+                newTriangles.Add(v3);
+                newTriangles.Add(mid31Index);
+                newTriangles.Add(mid23Index);
+            }
+            
+            // Remplacer les anciens triangles par les nouveaux
+            triangles.Clear();
+            triangles.AddRange(newTriangles);
+        }
+        
+        // === MÉTHODES DE SUBDIVISION ADAPTATIVE ===
+        
+        void CreateAdaptiveSphereMesh(List<Vector3> baseVertices, List<int> baseTriangles, 
+            List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
+            
+            if (useChunkedGeneration) {
+                CreateChunkedSphereMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
+            } else {
+                CreateProgressiveSphereMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
+            }
+        }
+        
+        void CreateChunkedSphereMesh(List<Vector3> baseVertices, List<int> baseTriangles, 
+            List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
+            
+            // Subdivision par chunks pour éviter l'explosion mémoire
+            int totalDivisions = divisions;
+            int safeDivisions = Mathf.Min(totalDivisions, maxSafeDivisions);
+            int remainingDivisions = totalDivisions - safeDivisions;
+            
+            // Subdivision de base sûre
+            for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(baseVertices, baseTriangles);
             }
             
+            // Subdivision progressive par chunks pour les divisions restantes
+            if (remainingDivisions > 0) {
+                CreateProgressiveSubdivision(baseVertices, baseTriangles, remainingDivisions);
+            }
+            
+            // Appliquer les hauteurs
+            ApplyHeightsToMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
+        }
+        
+        void CreateProgressiveSphereMesh(List<Vector3> baseVertices, List<int> baseTriangles, 
+            List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
+            
+            // Subdivision progressive avec optimisation mémoire
+            for (int division = 0; division < divisions; division++) {
+                if (baseVertices.Count > 50000) { // Limite de sécurité plus stricte
+                    Debug.LogWarning($"⚠️ Limite de vertices atteinte à la division {division}. Arrêt de la subdivision progressive.");
+                    break;
+                }
+                SubdivideSphere(baseVertices, baseTriangles);
+                Debug.Log($"📊 Division {division}: {baseVertices.Count} vertices, {baseTriangles.Count/3} triangles");
+            }
+            
+            // Appliquer les hauteurs
+            ApplyHeightsToMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
+        }
+        
+        void CreateProgressiveSubdivision(List<Vector3> vertices, List<int> triangles, int remainingDivisions) {
+            // Subdivision progressive avec gestion mémoire
+            for (int i = 0; i < remainingDivisions; i++) {
+                if (vertices.Count > 500000) { // Limite de sécurité
+                    Debug.LogWarning($"⚠️ Limite de vertices atteinte. Arrêt de la subdivision.");
+                    break;
+                }
+                SubdivideSphere(vertices, triangles);
+            }
+        }
+        
+        void ApplyHeightsToMesh(List<Vector3> baseVertices, List<int> baseTriangles, List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
             // Appliquer les hauteurs et créer le mesh final
             for (int i = 0; i < baseVertices.Count; i++) {
                 Vector3 vertex = baseVertices[i];
@@ -583,6 +1237,48 @@ namespace HexasphereProcedural {
             GUILayout.Label($"Forme préservée: {(preserveBaseShape ? "ON" : "OFF")}");
             GUILayout.Label($"Force aplatissement: {oceanFlatteningStrength:F2}");
             
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Optimisation:");
+            GUILayout.Label($"Subdivision adaptative: {(useAdaptiveSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Divisions sûres max: {maxSafeDivisions}");
+            GUILayout.Label($"Génération par chunks: {(useChunkedGeneration ? "ON" : "OFF")}");
+            GUILayout.Label($"Taille chunk: {chunkSize}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Subdivision triangulaire:");
+            GUILayout.Label($"Triangulaire: {(useTriangularSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Max divisions: {maxTriangularDivisions}");
+            GUILayout.Label($"Subdivision simple: {(useSimpleEdgeSubdivision ? "ON" : "OFF")}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Limites de sécurité:");
+            GUILayout.Label($"Max vertices: {maxVerticesLimit:N0}");
+            GUILayout.Label($"Limites intelligentes: {(useSmartLimits ? "ON" : "OFF")}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Subdivision Hexasphere:");
+            GUILayout.Label($"Hexasphere: {(useHexasphereSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Max divisions: {hexasphereMaxDivisions}");
+            GUILayout.Label($"Mode sécurisé: {(useSafeMode ? "ON" : "OFF")}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Subdivision intelligente:");
+            GUILayout.Label($"Intelligente: {(useIntelligentSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Max divisions: {maxIntelligentDivisions}");
+            GUILayout.Label($"Qualité: {subdivisionQuality:F2}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Subdivision hexagone:");
+            GUILayout.Label($"Hexagone: {(useHexagonSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Max divisions: {hexagonMaxDivisions}");
+            GUILayout.Label($"Rangées: {(useHexagonRows ? "ON" : "OFF")}");
+            
             GUILayout.Space(10);
             
             GUILayout.Label("Matériaux:");
@@ -650,6 +1346,82 @@ namespace HexasphereProcedural {
             GUILayout.Space(5);
             
             if (GUILayout.Button("🌍 Régénérer Planète Complète")) {
+                RegeneratePlanet();
+            }
+            
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("⚡ Toggle Subdivision Adaptative")) {
+                useAdaptiveSubdivision = !useAdaptiveSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("📦 Toggle Génération par Chunks")) {
+                useChunkedGeneration = !useChunkedGeneration;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("⚡ Forcer Subdivision Adaptative")) {
+                ForceAdaptiveSubdivision();
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("📊 Afficher Infos Divisions")) {
+                ShowDivisionInfo();
+            }
+            
+            if (GUILayout.Button("🔺 Toggle Subdivision Triangulaire")) {
+                useTriangularSubdivision = !useTriangularSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🔧 Toggle Subdivision Simple")) {
+                useSimpleEdgeSubdivision = !useSimpleEdgeSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🛡️ Augmenter Limite Vertices")) {
+                maxVerticesLimit = Mathf.Min(maxVerticesLimit * 2, 1000000);
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🛡️ Réduire Limite Vertices")) {
+                maxVerticesLimit = Mathf.Max(maxVerticesLimit / 2, 10000);
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🔺 Toggle Subdivision Hexasphere")) {
+                useHexasphereSubdivision = !useHexasphereSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🛡️ Toggle Mode Sécurisé")) {
+                useSafeMode = !useSafeMode;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🎯 Toggle Subdivision Intelligente")) {
+                useIntelligentSubdivision = !useIntelligentSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🎯 Augmenter Qualité")) {
+                subdivisionQuality = Mathf.Min(subdivisionQuality + 0.1f, 1.0f);
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🎯 Réduire Qualité")) {
+                subdivisionQuality = Mathf.Max(subdivisionQuality - 0.1f, 0.1f);
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🔷 Toggle Subdivision Hexagone")) {
+                useHexagonSubdivision = !useHexagonSubdivision;
+                RegeneratePlanet();
+            }
+            
+            if (GUILayout.Button("🔷 Toggle Rangées Hexagone")) {
+                useHexagonRows = !useHexagonRows;
                 RegeneratePlanet();
             }
             
@@ -1000,6 +1772,40 @@ namespace HexasphereProcedural {
             // Réinitialiser le LOD
             currentLOD = 0;
             ForceLODUpdate();
+        }
+        
+        // Méthode pour forcer l'activation de la subdivision adaptative
+        public void ForceAdaptiveSubdivision() {
+            useAdaptiveSubdivision = true;
+            maxSafeDivisions = 5; // Plus strict
+            useChunkedGeneration = true;
+            Debug.Log("⚡ Subdivision adaptative forcée - max sûres: 5");
+        }
+        
+        // Méthode pour calculer le nombre de vertices attendu
+        public int CalculateExpectedVertices(int divisions) {
+            // Icosaèdre de base : 12 vertices, 20 triangles
+            int vertices = 12;
+            int triangles = 20;
+            
+            for (int i = 0; i < divisions; i++) {
+                // Chaque division multiplie les triangles par 4
+                triangles *= 4;
+                // Vertices = triangles * 3 / 2 (approximation)
+                vertices = triangles * 3 / 2;
+            }
+            
+            return vertices;
+        }
+        
+        // Méthode pour afficher les informations de debug
+        public void ShowDivisionInfo() {
+            int expectedVertices = CalculateExpectedVertices(divisions);
+            Debug.Log($"📊 Informations pour {divisions} divisions:");
+            Debug.Log($"   Vertices attendus: {expectedVertices:N0}");
+            Debug.Log($"   Triangles attendus: {expectedVertices * 2 / 3:N0}");
+            Debug.Log($"   Limite de sécurité: 100,000 vertices");
+            Debug.Log($"   Utilisation mémoire estimée: {(expectedVertices * 3 * 4) / 1024 / 1024:F1} MB");
         }
         
         // === SYSTÈME OCÉANS AVANCÉ ===
