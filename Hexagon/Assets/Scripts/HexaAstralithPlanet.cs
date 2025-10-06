@@ -97,6 +97,10 @@ namespace HexasphereProcedural {
         private Dictionary<int, Mesh> lodMeshes = new Dictionary<int, Mesh>();
         private Dictionary<int, Material[]> lodMaterials = new Dictionary<int, Material[]>();
         
+        // Sauvegarde du mesh original
+        private Mesh originalMesh;
+        private Material[] originalMaterials;
+        
         void Start() {
             // Appliquer le tag à l'objet
             ApplyTagToObject();
@@ -367,6 +371,13 @@ namespace HexasphereProcedural {
             
             meshFilter.mesh = mesh;
             
+            // Sauvegarder le mesh original pour le LOD 0
+            originalMesh = mesh;
+            originalMaterials = new Material[3];
+            originalMaterials[0] = waterMaterial;
+            originalMaterials[1] = landMaterial;
+            originalMaterials[2] = mountainMaterial;
+            
             // Appliquer les matériaux
             ApplyMultiMaterials();
             
@@ -621,6 +632,27 @@ namespace HexasphereProcedural {
                 GeneratePlanet(); // Régénérer avec le nouveau système
             }
             
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("🔄 Régénérer LOD 0")) {
+                RegenerateLODLevel(0);
+            }
+            if (GUILayout.Button("🔄 Régénérer LOD 1")) {
+                RegenerateLODLevel(1);
+            }
+            if (GUILayout.Button("🔄 Régénérer LOD 2")) {
+                RegenerateLODLevel(2);
+            }
+            if (GUILayout.Button("🔄 Régénérer LOD 3")) {
+                RegenerateLODLevel(3);
+            }
+            
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("🌍 Régénérer Planète Complète")) {
+                RegeneratePlanet();
+            }
+            
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
@@ -667,6 +699,17 @@ namespace HexasphereProcedural {
         void ApplyLODLevel(int lodLevel) {
             currentLOD = lodLevel;
             
+            // Pour le LOD 0, utiliser le mesh original
+            if (lodLevel == 0 && originalMesh != null) {
+                if (meshFilter != null) {
+                    meshFilter.mesh = originalMesh;
+                }
+                if (meshRenderer != null && originalMaterials != null) {
+                    meshRenderer.materials = originalMaterials;
+                }
+                return;
+            }
+            
             // Générer le mesh LOD si pas encore en cache
             if (!lodMeshes.ContainsKey(lodLevel)) {
                 GenerateLODMesh(lodLevel);
@@ -692,18 +735,27 @@ namespace HexasphereProcedural {
             Mesh tempMesh = new Mesh();
             tempMesh.name = $"HexaLOD_{lodLevel}";
             
-            // Générer les vertices et triangles pour ce niveau LOD
+            // Générer les vertices et triangles pour ce niveau LOD avec matériaux
             List<Vector3> vertices = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
             List<int> triangles = new List<int>();
+            List<int> waterTriangles = new List<int>();
+            List<int> landTriangles = new List<int>();
+            List<int> mountainTriangles = new List<int>();
             
             // Utiliser la méthode de génération existante avec moins de divisions
-            CreateLODSphereMesh(vertices, uvs, triangles, lodLevel);
+            CreateLODSphereMeshWithMaterials(vertices, uvs, triangles, waterTriangles, landTriangles, mountainTriangles, lodLevel);
             
-            // Créer le mesh final
+            // Créer le mesh final avec submeshes
             tempMesh.vertices = vertices.ToArray();
             tempMesh.uv = uvs.ToArray();
-            tempMesh.triangles = triangles.ToArray();
+            
+            // Créer les submeshes pour les différents matériaux
+            tempMesh.subMeshCount = 3;
+            tempMesh.SetTriangles(waterTriangles, 0);
+            tempMesh.SetTriangles(landTriangles, 1);
+            tempMesh.SetTriangles(mountainTriangles, 2);
+            
             tempMesh.RecalculateNormals();
             tempMesh.RecalculateBounds();
             
@@ -712,6 +764,63 @@ namespace HexasphereProcedural {
             // Créer les matériaux pour ce niveau LOD
             Material[] materials = CreateMaterialsForLOD(lodLevel);
             lodMaterials[lodLevel] = materials;
+        }
+        
+        void CreateLODSphereMeshWithMaterials(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles, 
+            List<int> waterTriangles, List<int> landTriangles, List<int> mountainTriangles, int lodLevel) {
+            // Créer un icosaèdre de base
+            List<Vector3> baseVertices = CreateIcosahedronVertices();
+            List<int> baseTriangles = CreateIcosahedronTriangles();
+            
+            // Subdiviser selon le niveau LOD
+            int divisions = GetDivisionsForLOD(lodLevel);
+            for (int division = 0; division < divisions; division++) {
+                SubdivideSphere(baseVertices, baseTriangles);
+            }
+            
+            // Appliquer les hauteurs et créer le mesh final
+            for (int i = 0; i < baseVertices.Count; i++) {
+                Vector3 vertex = baseVertices[i];
+                float height = GenerateHeightForLOD(vertex, lodLevel);
+                
+                Vector3 finalVertex = vertex * (radius + height);
+                vertices.Add(finalVertex);
+                uvs.Add(new Vector2(vertex.x, vertex.y));
+            }
+            
+            // Copier les triangles et les assigner aux bons matériaux
+            for (int i = 0; i < baseTriangles.Count; i += 3) {
+                int v1 = baseTriangles[i];
+                int v2 = baseTriangles[i + 1];
+                int v3 = baseTriangles[i + 2];
+                
+                // Déterminer le type de terrain pour ce triangle
+                TerrainType terrainType = DetermineTerrainTypeForTriangle(vertices[v1], vertices[v2], vertices[v3]);
+                
+                // Assigner le triangle au bon submesh
+                switch (terrainType) {
+                    case TerrainType.Water:
+                        waterTriangles.Add(v1);
+                        waterTriangles.Add(v2);
+                        waterTriangles.Add(v3);
+                        break;
+                    case TerrainType.Land:
+                        landTriangles.Add(v1);
+                        landTriangles.Add(v2);
+                        landTriangles.Add(v3);
+                        break;
+                    case TerrainType.Mountain:
+                        mountainTriangles.Add(v1);
+                        mountainTriangles.Add(v2);
+                        mountainTriangles.Add(v3);
+                        break;
+                }
+                
+                // Ajouter aussi au mesh principal
+                triangles.Add(v1);
+                triangles.Add(v2);
+                triangles.Add(v3);
+            }
         }
         
         void CreateLODSphereMesh(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles, int lodLevel) {
@@ -861,6 +970,38 @@ namespace HexasphereProcedural {
             UpdateLOD();
         }
         
+        // Méthode pour forcer la régénération d'un niveau LOD spécifique
+        public void RegenerateLODLevel(int lodLevel) {
+            if (lodMeshes.ContainsKey(lodLevel)) {
+                lodMeshes.Remove(lodLevel);
+            }
+            if (lodMaterials.ContainsKey(lodLevel)) {
+                lodMaterials.Remove(lodLevel);
+            }
+            
+            // Régénérer le mesh LOD
+            GenerateLODMesh(lodLevel);
+            
+            // Appliquer immédiatement si c'est le niveau actuel
+            if (currentLOD == lodLevel) {
+                ApplyLODLevel(lodLevel);
+            }
+        }
+        
+        // Méthode pour forcer la régénération complète de la planète
+        public void RegeneratePlanet() {
+            // Vider le cache LOD
+            lodMeshes.Clear();
+            lodMaterials.Clear();
+            
+            // Régénérer le mesh original
+            CreateMesh();
+            
+            // Réinitialiser le LOD
+            currentLOD = 0;
+            ForceLODUpdate();
+        }
+        
         // === SYSTÈME OCÉANS AVANCÉ ===
         
         float ApplyAdvancedOceanSystem(Vector3 vertex, float originalHeight) {
@@ -895,6 +1036,41 @@ namespace HexasphereProcedural {
         public float GetHeightWithOceans(Vector3 vertex) {
             float baseHeight = GenerateHeight(vertex);
             return ApplyAdvancedOceanSystem(vertex, baseHeight);
+        }
+        
+        // === MÉTHODES LOD AVANCÉES ===
+        
+        TerrainType DetermineTerrainTypeForTriangle(Vector3 v1, Vector3 v2, Vector3 v3) {
+            // Calculer la hauteur moyenne du triangle
+            Vector3 center = (v1 + v2 + v3) / 3f;
+            
+            // Utiliser la même logique de génération que le mesh principal
+            // pour assurer la cohérence
+            float height = GenerateHeight(center.normalized);
+            
+            // Appliquer le système d'océans avancé si activé
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(center.normalized, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                if (useFlatOceans && height <= waterLevel) {
+                    height = 0f; // Océans parfaitement plats
+                } else if (height > waterLevel) {
+                    // Pour les terres, ajuster la hauteur
+                    if (forceOceanLevel) {
+                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Déterminer le type de terrain basé sur la hauteur
+            if (height <= waterLevel) {
+                return TerrainType.Water;
+            } else if (height <= mountainLevel) {
+                return TerrainType.Land;
+            } else {
+                return TerrainType.Mountain;
+            }
         }
     }
 }

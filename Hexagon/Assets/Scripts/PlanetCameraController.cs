@@ -42,12 +42,14 @@ namespace HexasphereProcedural {
         [Header("🎨 Interface")]
         [SerializeField] public bool showDebugInfo = true;
         
+        [Header("📷 État Caméra")]
+        [SerializeField] private Vector3 currentRotation;
+        [SerializeField] private float currentDistance;
+        [SerializeField] private Vector3 targetRotation;
+        [SerializeField] private float targetDistance;
+        
         // Variables privées
         private Camera cam;
-        private Vector3 currentRotation;
-        private float currentDistance;
-        private Vector3 targetRotation;
-        private float targetDistance;
         private bool isOrbiting = false; // Tourner autour de la planète
         private bool isFreeLooking = false; // Orientation libre sur place
         private Vector3 lastMousePosition;
@@ -77,11 +79,19 @@ namespace HexasphereProcedural {
                 cam = gameObject.AddComponent<Camera>();
             }
             
-            // Initialiser les valeurs
-            currentDistance = defaultDistance;
-            targetDistance = defaultDistance;
-            currentRotation = transform.eulerAngles;
-            targetRotation = currentRotation;
+            // Initialiser les valeurs seulement si elles n'ont pas été définies dans l'inspector
+            if (currentDistance == 0f) {
+                currentDistance = defaultDistance;
+            }
+            if (targetDistance == 0f) {
+                targetDistance = defaultDistance;
+            }
+            if (currentRotation == Vector3.zero) {
+                currentRotation = transform.eulerAngles;
+            }
+            if (targetRotation == Vector3.zero) {
+                targetRotation = currentRotation;
+            }
             
             // Positionner la caméra initialement
             SetupInitialCamera();
@@ -572,6 +582,14 @@ namespace HexasphereProcedural {
             targetRotation = Vector3.zero;
             targetDistance = defaultDistance;
             
+        }
+        
+        // Méthode pour réinitialiser aux valeurs par défaut
+        public void ResetToDefaults() {
+            currentDistance = defaultDistance;
+            targetDistance = defaultDistance;
+            currentRotation = Vector3.zero;
+            targetRotation = Vector3.zero;
         }
         
         void FocusOnPlanet() {
