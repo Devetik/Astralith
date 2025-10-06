@@ -50,8 +50,52 @@ namespace HexasphereProcedural {
         [SerializeField] public bool useFlatOceans = true;  
         [SerializeField] public bool forceOceanLevel = true;
         
+        [Header("🎯 Système LOD")]
+        [SerializeField] public bool enableLOD = true;
+        [SerializeField] public Transform cameraTransform;
+        [SerializeField] public float lodUpdateInterval = 0.1f;
+        [SerializeField] public float lod0Distance = 10f;
+        [SerializeField] public float lod1Distance = 25f;
+        [SerializeField] public float lod2Distance = 50f;
+        [SerializeField] public float lod3Distance = 100f;
+        [SerializeField] public float cullDistance = 200f;
+        [SerializeField] public int lod0Divisions = 4;
+        [SerializeField] public int lod1Divisions = 3;
+        [SerializeField] public int lod2Divisions = 2;
+        [SerializeField] public int lod3Divisions = 1;
+        
+        [Header("🌊 LOD Frontières")]
+        [SerializeField] public bool enableBoundaryLOD = true;
+        [SerializeField] public float boundaryDetectionRadius = 2f;
+        [SerializeField] public int boundarySubdivisionLevel = 2;
+        [SerializeField] public bool detectWaterLandBoundaries = true;
+        [SerializeField] public bool detectMountainBoundaries = true;
+        
+        [Header("🎨 LOD Transitions")]
+        [SerializeField] public bool enableTransitionSmoothing = true;
+        [SerializeField] public float transitionWidth = 1f;
+        [SerializeField] public int transitionSubdivisions = 3;
+        [SerializeField] public bool smoothWaterLandTransitions = true;
+        [SerializeField] public bool smoothMountainTransitions = true;
+        
+        [Header("🌊 LOD Océans")]
+        [SerializeField] public bool preserveOceanStructure = true;
+        [SerializeField] public float oceanStructureStrength = 0.5f;
+        
+        [Header("🌊 Système Océans Avancé")]
+        [SerializeField] public bool useAdvancedOceanSystem = true;
+        [SerializeField] public bool preserveBaseShape = true;
+        [SerializeField] public float oceanFlatteningStrength = 1f;
+        
         private MeshRenderer meshRenderer;
         private MeshFilter meshFilter;
+        
+        // Variables LOD
+        private int currentLOD = 0;
+        private float lastLODUpdate = 0f;
+        private float currentDistance = 0f;
+        private Dictionary<int, Mesh> lodMeshes = new Dictionary<int, Mesh>();
+        private Dictionary<int, Material[]> lodMaterials = new Dictionary<int, Material[]>();
         
         void Start() {
             // Appliquer le tag à l'objet
@@ -68,14 +112,16 @@ namespace HexasphereProcedural {
             if (Input.GetKeyDown(KeyCode.H)) {
                 ToggleHeightControl();
             }
+            
+            // Mise à jour du système LOD
+            if (enableLOD && Time.time - lastLODUpdate > lodUpdateInterval) {
+                UpdateLOD();
+                lastLODUpdate = Time.time;
+            }
         }
         
         public void GeneratePlanet() {
-            Debug.Log("🌍 Génération de la planète HexaAstralith...");
-            
             CreateMesh();
-            
-            Debug.Log("✅ Planète HexaAstralith générée !");
         }
         
         void ApplyTagToObject() {
@@ -92,10 +138,6 @@ namespace HexasphereProcedural {
             
             // Appliquer le tag
             gameObject.tag = objectTag;
-            
-            if (showDebugInfo) {
-                Debug.Log($"🏷️ Tag '{objectTag}' appliqué à {gameObject.name}");
-            }
         }
         
         bool IsTagValid(string tag) {
@@ -151,13 +193,18 @@ namespace HexasphereProcedural {
                 Vector3 vertex = baseVertices[i];
                 float height = GenerateHeight(vertex);
                 
-                // Gestion des océans plats
-                if (useFlatOceans && height <= waterLevel) {
-                    height = 0f; // Océans parfaitement plats
-                } else if (height > waterLevel) {
-                    // Pour les terres, ajuster la hauteur
-                    if (forceOceanLevel) {
-                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                // Nouveau système d'océans qui préserve la forme de base
+                if (useAdvancedOceanSystem && preserveBaseShape) {
+                    height = ApplyAdvancedOceanSystem(vertex, height);
+                } else {
+                    // Ancien système (pour compatibilité)
+                    if (useFlatOceans && height <= waterLevel) {
+                        height = 0f; // Océans parfaitement plats
+                    } else if (height > waterLevel) {
+                        // Pour les terres, ajuster la hauteur
+                        if (forceOceanLevel) {
+                            height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                        }
                     }
                 }
                 
@@ -508,6 +555,23 @@ namespace HexasphereProcedural {
             GUILayout.Label($"Contrôle hauteur: {(useHeightControl ? "ON" : "OFF")}");
             GUILayout.Label($"Ridges: {(useRidgeNoise ? "ON" : "OFF")}");
             
+            GUILayout.Space(5);
+            
+            GUILayout.Label("LOD:");
+            GUILayout.Label($"LOD actuel: {currentLOD}");
+            GUILayout.Label($"Distance: {currentDistance:F1}");
+            GUILayout.Label($"LOD activé: {(enableLOD ? "ON" : "OFF")}");
+            GUILayout.Label($"Frontières: {(enableBoundaryLOD ? "ON" : "OFF")}");
+            GUILayout.Label($"Transitions: {(enableTransitionSmoothing ? "ON" : "OFF")}");
+            GUILayout.Label($"Océans préservés: {(preserveOceanStructure ? "ON" : "OFF")}");
+            
+            GUILayout.Space(5);
+            
+            GUILayout.Label("Océans avancés:");
+            GUILayout.Label($"Système avancé: {(useAdvancedOceanSystem ? "ON" : "OFF")}");
+            GUILayout.Label($"Forme préservée: {(preserveBaseShape ? "ON" : "OFF")}");
+            GUILayout.Label($"Force aplatissement: {oceanFlatteningStrength:F2}");
+            
             GUILayout.Space(10);
             
             GUILayout.Label("Matériaux:");
@@ -527,8 +591,310 @@ namespace HexasphereProcedural {
                 ApplyTagNow();
             }
             
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("🎯 Forcer LOD 0")) {
+                SetLODLevel(0);
+            }
+            if (GUILayout.Button("🎯 Forcer LOD 1")) {
+                SetLODLevel(1);
+            }
+            if (GUILayout.Button("🎯 Forcer LOD 2")) {
+                SetLODLevel(2);
+            }
+            if (GUILayout.Button("🎯 Forcer LOD 3")) {
+                SetLODLevel(3);
+            }
+            if (GUILayout.Button("🔄 Mise à jour LOD")) {
+                ForceLODUpdate();
+            }
+            
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("🌊 Toggle Système Océans Avancé")) {
+                useAdvancedOceanSystem = !useAdvancedOceanSystem;
+                GeneratePlanet(); // Régénérer avec le nouveau système
+            }
+            
+            if (GUILayout.Button("🔧 Toggle Préservation Forme")) {
+                preserveBaseShape = !preserveBaseShape;
+                GeneratePlanet(); // Régénérer avec le nouveau système
+            }
+            
             GUILayout.EndVertical();
             GUILayout.EndArea();
+        }
+        
+        // === SYSTÈME LOD ===
+        
+        void UpdateLOD() {
+            if (cameraTransform == null) {
+                Camera mainCamera = Camera.main;
+                if (mainCamera != null) {
+                    cameraTransform = mainCamera.transform;
+                } else {
+                    return;
+                }
+            }
+            
+            // Calculer la distance à la caméra
+            currentDistance = Vector3.Distance(transform.position, cameraTransform.position);
+            
+            // Déterminer le niveau LOD approprié
+            int newLOD = DetermineLODLevel(currentDistance);
+            
+            // Appliquer le nouveau niveau LOD si nécessaire
+            if (newLOD != currentLOD) {
+                ApplyLODLevel(newLOD);
+            }
+            
+            // Culling si trop loin
+            if (currentDistance > cullDistance) {
+                SetVisibility(false);
+            } else {
+                SetVisibility(true);
+            }
+        }
+        
+        int DetermineLODLevel(float distance) {
+            if (distance <= lod0Distance) return 0;
+            if (distance <= lod1Distance) return 1;
+            if (distance <= lod2Distance) return 2;
+            if (distance <= lod3Distance) return 3;
+            return 3; // LOD le plus bas par défaut
+        }
+        
+        void ApplyLODLevel(int lodLevel) {
+            currentLOD = lodLevel;
+            
+            // Générer le mesh LOD si pas encore en cache
+            if (!lodMeshes.ContainsKey(lodLevel)) {
+                GenerateLODMesh(lodLevel);
+            }
+            
+            // Appliquer le mesh LOD
+            if (meshFilter != null && lodMeshes.ContainsKey(lodLevel)) {
+                meshFilter.mesh = lodMeshes[lodLevel];
+            }
+            
+            // Appliquer les matériaux LOD
+            if (meshRenderer != null && lodMaterials.ContainsKey(lodLevel)) {
+                meshRenderer.materials = lodMaterials[lodLevel];
+            }
+            
+            if (showDebugInfo) {
+                Debug.Log($"🎯 LOD changé vers niveau {lodLevel} (distance: {currentDistance:F1})");
+            }
+        }
+        
+        void GenerateLODMesh(int lodLevel) {
+            // Créer un mesh temporaire pour ce niveau LOD
+            Mesh tempMesh = new Mesh();
+            tempMesh.name = $"HexaLOD_{lodLevel}";
+            
+            // Générer les vertices et triangles pour ce niveau LOD
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> triangles = new List<int>();
+            
+            // Utiliser la méthode de génération existante avec moins de divisions
+            CreateLODSphereMesh(vertices, uvs, triangles, lodLevel);
+            
+            // Créer le mesh final
+            tempMesh.vertices = vertices.ToArray();
+            tempMesh.uv = uvs.ToArray();
+            tempMesh.triangles = triangles.ToArray();
+            tempMesh.RecalculateNormals();
+            tempMesh.RecalculateBounds();
+            
+            lodMeshes[lodLevel] = tempMesh;
+            
+            // Créer les matériaux pour ce niveau LOD
+            Material[] materials = CreateMaterialsForLOD(lodLevel);
+            lodMaterials[lodLevel] = materials;
+        }
+        
+        void CreateLODSphereMesh(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles, int lodLevel) {
+            // Créer un icosaèdre de base
+            List<Vector3> baseVertices = CreateIcosahedronVertices();
+            List<int> baseTriangles = CreateIcosahedronTriangles();
+            
+            // Subdiviser selon le niveau LOD
+            int divisions = GetDivisionsForLOD(lodLevel);
+            for (int division = 0; division < divisions; division++) {
+                SubdivideSphere(baseVertices, baseTriangles);
+            }
+            
+            // Appliquer les hauteurs et créer le mesh final
+            for (int i = 0; i < baseVertices.Count; i++) {
+                Vector3 vertex = baseVertices[i];
+                float height = GenerateHeightForLOD(vertex, lodLevel);
+                
+                Vector3 finalVertex = vertex * (radius + height);
+                vertices.Add(finalVertex);
+                uvs.Add(new Vector2(vertex.x, vertex.y));
+            }
+            
+            // Copier les triangles
+            triangles.AddRange(baseTriangles);
+        }
+        
+        float GenerateHeightForLOD(Vector3 position, int lodLevel) {
+            // Réduire la complexité du bruit selon le niveau LOD
+            float noiseScaleLOD = noiseScale;
+            float heightAmplitudeLOD = heightAmplitude;
+            
+            // Réduire seulement la complexité du bruit, pas l'amplitude globale
+            if (lodLevel >= 2) {
+                noiseScaleLOD *= 0.5f;
+                // Préserver l'amplitude pour maintenir les océans
+            }
+            if (lodLevel >= 3) {
+                noiseScaleLOD *= 0.3f;
+                // Préserver l'amplitude pour maintenir les océans
+            }
+            
+            // Générer le bruit avec la complexité réduite mais amplitude préservée
+            float height = GeneratePerlinHeightLOD(position, noiseScaleLOD, heightAmplitudeLOD, lodLevel);
+            
+            // Appliquer le système d'océans avancé pour le LOD aussi
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(position, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                if (useFlatOceans && height <= waterLevel) {
+                    height = 0f; // Océans parfaitement plats
+                } else if (height > waterLevel) {
+                    // Pour les terres, ajuster la hauteur
+                    if (forceOceanLevel) {
+                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            return height;
+        }
+        
+        float GeneratePerlinHeightLOD(Vector3 position, float noiseScaleLOD, float heightAmplitudeLOD, int lodLevel) {
+            // Version simplifiée du bruit pour les niveaux LOD élevés
+            float latitude = Mathf.Asin(position.y);
+            float longitude = Mathf.Atan2(position.z, position.x);
+            
+            float u = (longitude + Mathf.PI) / (2f * Mathf.PI);
+            float v = (latitude + Mathf.PI / 2f) / Mathf.PI;
+            
+            // Moins d'octaves pour les niveaux LOD élevés, mais garder au moins 2 octaves
+            float height = 0f;
+            float frequency = 1f;
+            float amplitude = heightAmplitudeLOD;
+            float maxValue = 0f;
+            
+            int octaves = Mathf.Max(2, 6 - lodLevel); // Réduire les octaves mais garder au moins 2
+            
+            for (int i = 0; i < octaves; i++) {
+                float noiseValue = Mathf.PerlinNoise(
+                    u * noiseScaleLOD * frequency,
+                    v * noiseScaleLOD * frequency
+                );
+                height += noiseValue * amplitude;
+                maxValue += amplitude;
+                frequency *= 2f;
+                amplitude *= 0.5f;
+            }
+            
+            if (maxValue > 0) {
+                height = height / maxValue;
+            }
+            
+            // Pour les niveaux LOD élevés, ajouter un bruit de base pour maintenir la structure
+            if (lodLevel >= 2 && preserveOceanStructure) {
+                float baseNoise = Mathf.PerlinNoise(u * noiseScaleLOD * 0.5f, v * noiseScaleLOD * 0.5f);
+                height = Mathf.Lerp(height, baseNoise, oceanStructureStrength); // Mélanger avec un bruit de base
+            }
+            
+            return height;
+        }
+        
+        Material[] CreateMaterialsForLOD(int lodLevel) {
+            Material[] materials = new Material[3]; // Eau, Terre, Montagne
+            
+            // Utiliser les matériaux existants pour tous les niveaux LOD
+            materials[0] = waterMaterial;
+            materials[1] = landMaterial;
+            materials[2] = mountainMaterial;
+            
+            return materials;
+        }
+        
+        int GetDivisionsForLOD(int lodLevel) {
+            switch (lodLevel) {
+                case 0: return lod0Divisions;
+                case 1: return lod1Divisions;
+                case 2: return lod2Divisions;
+                case 3: return lod3Divisions;
+                default: return lod3Divisions;
+            }
+        }
+        
+        void SetVisibility(bool visible) {
+            if (meshRenderer != null) {
+                meshRenderer.enabled = visible;
+            }
+        }
+        
+        // Méthodes publiques LOD
+        public void SetLODLevel(int lodLevel) {
+            if (lodLevel >= 0 && lodLevel <= 3) {
+                ApplyLODLevel(lodLevel);
+            }
+        }
+        
+        public int GetCurrentLOD() {
+            return currentLOD;
+        }
+        
+        public float GetCurrentDistance() {
+            return currentDistance;
+        }
+        
+        public void ForceLODUpdate() {
+            UpdateLOD();
+        }
+        
+        // === SYSTÈME OCÉANS AVANCÉ ===
+        
+        float ApplyAdvancedOceanSystem(Vector3 vertex, float originalHeight) {
+            // Préserver la forme de base : ne pas modifier la hauteur globale
+            // Seulement aplatir les zones qui devraient être submergées
+            
+            if (originalHeight <= waterLevel) {
+                // Zone qui devrait être submergée
+                // Au lieu de mettre à 0, on aplatit progressivement vers le niveau de l'eau
+                float flatteningFactor = Mathf.Clamp01((waterLevel - originalHeight) / waterLevel);
+                float flattenedHeight = Mathf.Lerp(originalHeight, waterLevel, flatteningFactor * oceanFlatteningStrength);
+                
+                // Pour les océans plats, on peut encore les aplatir complètement si souhaité
+                if (useFlatOceans) {
+                    return waterLevel; // Niveau constant pour les océans
+                } else {
+                    return flattenedHeight; // Aplatissement progressif
+                }
+            } else {
+                // Zone terrestre : garder la hauteur originale
+                // Pas de modification de la forme de base
+                return originalHeight;
+            }
+        }
+        
+        // Méthode pour calculer la hauteur de base sans océans (pour debug)
+        public float GetBaseHeight(Vector3 vertex) {
+            return GenerateHeight(vertex);
+        }
+        
+        // Méthode pour calculer la hauteur avec océans appliqués
+        public float GetHeightWithOceans(Vector3 vertex) {
+            float baseHeight = GenerateHeight(vertex);
+            return ApplyAdvancedOceanSystem(vertex, baseHeight);
         }
     }
 }

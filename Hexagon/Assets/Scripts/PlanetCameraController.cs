@@ -37,6 +37,7 @@ namespace HexasphereProcedural {
         [SerializeField] public float cameraMoveSpeed = 2f;
         [SerializeField] public bool smoothCameraTransition = true;
         [SerializeField] public float animationDuration = 1f; // Durée fixe de 1 seconde
+        [SerializeField] public float acceptableDistanceRange = 2f; // Range de distance acceptable
         
         [Header("🎨 Interface")]
         [SerializeField] public bool showDebugInfo = true;
@@ -59,6 +60,7 @@ namespace HexasphereProcedural {
         
         // Animation de caméra
         private bool isMovingToPlanet = false;
+        private bool isPointingToPlanet = false;
         private Vector3 startPosition;
         private Quaternion startRotation;
         private Vector3 targetPosition;
@@ -70,15 +72,10 @@ namespace HexasphereProcedural {
         private bool hasSelectedPlanet = false;
         
         void Start() {
-            Debug.Log("🚀 DÉMARRAGE du contrôleur de caméra");
-            
             cam = GetComponent<Camera>();
             if (cam == null) {
-                Debug.Log("📷 Ajout d'un composant Camera");
                 cam = gameObject.AddComponent<Camera>();
             }
-            
-            Debug.Log($"📷 Caméra trouvée: {cam.name}");
             
             // Initialiser les valeurs
             currentDistance = defaultDistance;
@@ -86,15 +83,8 @@ namespace HexasphereProcedural {
             currentRotation = transform.eulerAngles;
             targetRotation = currentRotation;
             
-            Debug.Log($"📊 Valeurs initiales - Distance: {currentDistance}, Rotation: {currentRotation}");
-            
-            // Ne plus chercher automatiquement une planète
-            Debug.Log("🔍 Pas de recherche automatique de planète");
-            
             // Positionner la caméra initialement
             SetupInitialCamera();
-            
-            Debug.Log("✅ Contrôleur de caméra initialisé");
         }
         
         void Update() {
@@ -103,23 +93,13 @@ namespace HexasphereProcedural {
             
             // Test de sélection automatique si pas de planète sélectionnée
             if (!hasSelectedPlanet && Input.GetKeyDown(KeyCode.S)) {
-                Debug.Log("🔍 Sélection automatique de planète (touche S)");
                 FindNearestPlanet();
             }
         }
         
         void HandleInput() {
-            // Log des inputs pour debug
-            if (Input.GetMouseButtonDown(0)) {
-                Debug.Log("🖱️ CLIC GAUCHE DÉTECTÉ");
-            }
-            if (Input.GetMouseButtonDown(1)) {
-                Debug.Log("🖱️ CLIC DROIT DÉTECTÉ");
-            }
-            
             // Détection de clic gauche simple
             if (Input.GetMouseButtonDown(0)) {
-                Debug.Log("🖱️ Début clic gauche...");
                 mousePositionOnClick = Input.mousePosition;
                 lastMousePosition = Input.mousePosition;
                 clickStartTime = Time.time;
@@ -131,14 +111,10 @@ namespace HexasphereProcedural {
                 float clickDuration = Time.time - clickStartTime;
                 Vector3 clickMovement = Input.mousePosition - mousePositionOnClick;
                 
-                Debug.Log($"🖱️ Fin clic - Durée: {clickDuration:F2}s, Mouvement: {clickMovement.magnitude:F1}px");
                 
                 // Vérifier si c'est un clic simple
                 if (clickDuration <= clickMaxDuration && clickMovement.magnitude <= clickMaxMovement) {
-                    Debug.Log("🖱️ Clic simple détecté - recherche de planète");
                     SelectPlanetAtMouse();
-                } else {
-                    Debug.Log("🖱️ Mouvement détecté - pas de sélection de planète");
                 }
                 
                 isClicking = false;
@@ -146,33 +122,28 @@ namespace HexasphereProcedural {
             
             // Reset caméra
             if (Input.GetKeyDown(resetCameraKey)) {
-                Debug.Log("⌨️ RESET CAMÉRA");
                 ResetCamera();
             }
             
             // Focus sur planète
             if (Input.GetKeyDown(focusPlanetKey)) {
-                Debug.Log("⌨️ FOCUS PLANÈTE");
                 FocusOnPlanet();
             }
             
             // Tourner autour de la planète (clic droit)
             if (Input.GetMouseButtonDown(1)) {
-                Debug.Log("🖱️ Début orbite autour de la planète (clic droit)");
                 StartOrbiting();
             }
             if (Input.GetMouseButton(1)) {
                 UpdateOrbiting();
             }
             if (Input.GetMouseButtonUp(1)) {
-                Debug.Log("🖱️ Fin orbite autour de la planète (clic droit)");
                 StopOrbiting();
             }
             
             // Orientation libre sur place (clic gauche maintenu) - seulement si pas un clic simple
             if (Input.GetMouseButton(0) && hasSelectedPlanet && !isClicking) {
                 if (!isFreeLooking) {
-                    Debug.Log("🖱️ Début orientation libre (clic gauche maintenu)");
                     StartFreeLook();
                 }
                 UpdateFreeLook();
@@ -185,7 +156,6 @@ namespace HexasphereProcedural {
                 
                 // Si c'est un mouvement (pas un clic simple)
                 if (clickDuration > clickMaxDuration || clickMovement.magnitude > clickMaxMovement) {
-                    Debug.Log($"🖱️ Mouvement détecté - début orientation libre (durée: {clickDuration:F2}s, mouvement: {clickMovement.magnitude:F1}px)");
                     isClicking = false; // Arrêter la détection de clic
                     if (!isFreeLooking) {
                         StartFreeLook();
@@ -194,104 +164,85 @@ namespace HexasphereProcedural {
             }
             
             if (Input.GetMouseButtonUp(0) && isFreeLooking) {
-                Debug.Log("🖱️ Fin orientation libre (clic gauche relâché)");
                 StopFreeLook();
             }
             
             // Zoom avec molette
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0f) {
-                Debug.Log($"🖱️ ZOOM: {scroll}");
                 UpdateZoom(scroll);
             }
             
             // L'orientation libre avec clic gauche est gérée plus haut
         }
         
-        bool SelectPlanetAtMouse() {
-            Debug.Log("🔍 Recherche de planète au clic...");
+        bool SelectPlanetAtMouse() 
+        {
             Ray ray = cam.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
             
-            Debug.Log($"📷 Rayon depuis: {ray.origin}, direction: {ray.direction}");
-            Debug.Log($"🖱️ Position souris: {Input.mousePosition}");
-            
-            // Vérifier d'abord s'il y a des objets dans la scène
-            GameObject[] allObjects = FindObjectsOfType<GameObject>();
-            Debug.Log($"🌍 Nombre d'objets dans la scène: {allObjects.Length}");
-            
             // Chercher spécifiquement les planètes
             HexaAstralithPlanet[] planets = FindObjectsByType<HexaAstralithPlanet>(FindObjectsSortMode.None);
-            Debug.Log($"🌍 Nombre de planètes HexaAstralith: {planets.Length}");
             
-            foreach (HexaAstralithPlanet planet in planets) {
-                Debug.Log($"🌍 Planète trouvée: {planet.name}, position: {planet.transform.position}, tag: {planet.gameObject.tag}");
-            }
-            
-            // Essayer le raycast avec une distance plus grande
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity)) {
-                Debug.Log($"🎯 Objet touché: {hit.collider.name}, tag: {hit.collider.tag}, distance: {hit.distance}");
+            foreach (HexaAstralithPlanet planet in planets) 
+            {
                 
-                // Vérifier si c'est une planète (par nom, tag ou composant)
-                bool isPlanet = false;
-                
-                // Vérifier par tag
-                if (hit.collider.CompareTag("Planet")) {
-                    Debug.Log("✅ Planète détectée par TAG");
-                    isPlanet = true;
-                }
-                
-                // Vérifier par nom
-                if (hit.collider.name.Contains("Planet") || hit.collider.name.Contains("HexaAstralith")) {
-                    Debug.Log("✅ Planète détectée par NOM");
-                    isPlanet = true;
-                }
-                
-                // Vérifier par composant HexaAstralithPlanet
-                if (hit.collider.GetComponent<HexaAstralithPlanet>() != null) {
-                    Debug.Log("✅ Planète détectée par COMPOSANT");
-                    isPlanet = true;
-                }
-                
-                if (isPlanet) {
-                    // Vérifier si c'est la même planète déjà sélectionnée
-                    if (hasSelectedPlanet && targetPlanet != null && targetPlanet == hit.collider.transform) {
-                        Debug.Log($"🔄 Même planète cliquée: {hit.collider.name} - Aucun changement");
-                        return true; // Retourner true mais sans changer la configuration
+                // Essayer le raycast avec une distance plus grande
+                if (Physics.Raycast(ray, out hit, Mathf.Infinity)) {
+                    
+                    // Vérifier si c'est une planète (par nom, tag ou composant)
+                    bool isPlanet = false;
+                    
+                    // Vérifier par tag
+                    if (hit.collider.CompareTag("Planet")) {
+                        isPlanet = true;
                     }
                     
-                    SetTargetPlanet(hit.collider.transform);
-                    Debug.Log($"🎯 Planète sélectionnée: {hit.collider.name}");
-                    return true; // Planète sélectionnée
-                } else {
-                    Debug.Log("❌ Objet touché mais pas une planète");
-                }
-            } else {
-                Debug.Log("❌ Aucun objet touché par le rayon");
-                
-                // Essayer de sélectionner la planète la plus proche si le raycast échoue
-                if (planets.Length > 0) {
-                    Debug.Log("🔄 Tentative de sélection de la planète la plus proche...");
-                    Transform closestPlanet = planets[0].transform;
-                    float closestDistance = Vector3.Distance(transform.position, closestPlanet.position);
+                    // Vérifier par nom
+                    if (hit.collider.name.Contains("Planet") || hit.collider.name.Contains("HexaAstralith")) {
+                        isPlanet = true;
+                    }
                     
-                    for (int i = 1; i < planets.Length; i++) {
-                        float distance = Vector3.Distance(transform.position, planets[i].transform.position);
-                        if (distance < closestDistance) {
-                            closestDistance = distance;
-                            closestPlanet = planets[i].transform;
+                    // Vérifier par composant HexaAstralithPlanet
+                    if (hit.collider.GetComponent<HexaAstralithPlanet>() != null) {
+                        isPlanet = true;
+                    }
+                    
+                    if (isPlanet) {
+                        // Vérifier si c'est la même planète déjà sélectionnée
+                        if (hasSelectedPlanet && targetPlanet != null && targetPlanet == hit.collider.transform) {
+                            return true; // Retourner true mais sans changer la configuration
                         }
+                        
+                        SetTargetPlanet(hit.collider.transform);
+                        return true; // Planète sélectionnée
+                    } else {
                     }
+                } 
+                else 
+                {
                     
-                    // Vérifier si c'est la même planète déjà sélectionnée
-                    if (hasSelectedPlanet && targetPlanet != null && targetPlanet == closestPlanet) {
-                        Debug.Log($"🔄 Même planète la plus proche: {closestPlanet.name} - Aucun changement");
-                        return true; // Retourner true mais sans changer la configuration
+                    // Essayer de sélectionner la planète la plus proche si le raycast échoue
+                    if (planets.Length > 0) {
+                        Transform closestPlanet = planets[0].transform;
+                        float closestDistance = Vector3.Distance(transform.position, closestPlanet.position);
+                        
+                        for (int i = 1; i < planets.Length; i++) {
+                            float distance = Vector3.Distance(transform.position, planets[i].transform.position);
+                            if (distance < closestDistance) {
+                                closestDistance = distance;
+                                closestPlanet = planets[i].transform;
+                            }
+                        }
+                        
+                        // Vérifier si c'est la même planète déjà sélectionnée
+                        if (hasSelectedPlanet && targetPlanet != null && targetPlanet == closestPlanet) {
+                            return true; // Retourner true mais sans changer la configuration
+                        }
+                        
+                        SetTargetPlanet(closestPlanet);
+                        return true;
                     }
-                    
-                    Debug.Log($"🎯 Sélection de la planète la plus proche: {closestPlanet.name} (distance: {closestDistance:F2})");
-                    SetTargetPlanet(closestPlanet);
-                    return true;
                 }
             }
             
@@ -301,26 +252,18 @@ namespace HexasphereProcedural {
         void SetTargetPlanet(Transform planet) {
             // Vérifier si c'est la même planète déjà sélectionnée
             if (hasSelectedPlanet && targetPlanet != null && targetPlanet == planet) {
-                Debug.Log($"🔄 Même planète sélectionnée: {planet.name} - Aucun changement");
                 return; // Ne pas reset le focus si c'est la même planète
             }
             
-            Debug.Log($"🎯 Configuration de la planète cible: {planet.name}");
             targetPlanet = planet;
             hasSelectedPlanet = true;
             
             // Calculer le centre et le rayon de la planète
             CalculatePlanetInfo();
             
-            // Démarrer l'animation vers la planète
-            if (smoothCameraTransition) {
-                StartCameraMoveToPlanet();
-            } else {
-                // Positionnement instantané
-                SetupCameraAroundPlanet();
-            }
+            // Nouvelle logique : pointer vers la planète et se déplacer si nécessaire
+            StartPointingToPlanet();
             
-            Debug.Log($"✅ Planète configurée - Centre: {planetCenter}, Rayon: {planetRadius}");
         }
         
         void CalculatePlanetInfo() {
@@ -343,8 +286,12 @@ namespace HexasphereProcedural {
             maxDistance = planetRadius * 5f;
             defaultDistance = planetRadius * 3f;
             
-            currentDistance = defaultDistance;
-            targetDistance = defaultDistance;
+            // Ne pas changer la distance actuelle si elle est déjà définie
+            if (currentDistance == 0f) {
+                currentDistance = defaultDistance;
+                targetDistance = defaultDistance;
+            }
+            // Sinon, garder la distance actuelle
         }
         
         void SetupCameraAroundPlanet() {
@@ -365,10 +312,46 @@ namespace HexasphereProcedural {
             }
         }
         
+        void StartPointingToPlanet() {
+            if (targetPlanet == null) return;
+            
+            
+            // Sauvegarder la position et rotation actuelles AVANT tout calcul
+            startPosition = transform.position;
+            startRotation = transform.rotation;
+            
+            
+            // Calculer la distance actuelle à la planète
+            float currentDistanceToPlanet = Vector3.Distance(transform.position, planetCenter);
+            
+            // Rotation cible : regarder directement la planète depuis la position actuelle
+            targetRotationAnimation = Quaternion.LookRotation(planetCenter - transform.position);
+            
+            
+            // Vérifier si on doit se déplacer
+            if (currentDistanceToPlanet > acceptableDistanceRange) {
+                
+                // Calculer la position cible à une distance acceptable
+                Vector3 directionToPlanet = (planetCenter - transform.position).normalized;
+                targetPosition = planetCenter - directionToPlanet * acceptableDistanceRange;
+                
+                // Démarrer l'animation de déplacement
+                moveDuration = animationDuration;
+                moveStartTime = Time.time;
+                isMovingToPlanet = true;
+                
+            } else {
+                
+                // Juste pointer vers la planète, pas de déplacement
+                isPointingToPlanet = true;
+                moveDuration = animationDuration * 0.5f; // Plus rapide pour le pointage
+                moveStartTime = Time.time;
+            }
+        }
+        
         void StartCameraMoveToPlanet() {
             if (targetPlanet == null) return;
             
-            Debug.Log("🎬 Début animation vers la planète");
             
             // Sauvegarder la position et rotation actuelles
             startPosition = transform.position;
@@ -389,11 +372,10 @@ namespace HexasphereProcedural {
             
             isMovingToPlanet = true;
             
-            Debug.Log($"🎬 Animation: Direction={directionToPlanet:F2}, Durée={moveDuration:F2}s, Position cible={targetPosition:F2}");
         }
         
         void UpdateCameraMoveToPlanet() {
-            if (!isMovingToPlanet || targetPlanet == null) return;
+            if ((!isMovingToPlanet && !isPointingToPlanet) || targetPlanet == null) return;
             
             float elapsed = Time.time - moveStartTime;
             float progress = elapsed / moveDuration;
@@ -401,16 +383,22 @@ namespace HexasphereProcedural {
             if (progress >= 1f) {
                 // Animation terminée
                 isMovingToPlanet = false;
-                SetupCameraAroundPlanet();
-                Debug.Log("🎬 Animation terminée - caméra positionnée");
+                isPointingToPlanet = false;
+                // Ne pas appeler SetupCameraAroundPlanet() pour éviter le saut d'angle
                 return;
             }
             
             // Interpolation fluide
             float smoothProgress = Mathf.SmoothStep(0f, 1f, progress);
             
-            // Appliquer l'animation de position
-            transform.position = Vector3.Lerp(startPosition, targetPosition, smoothProgress);
+            // Appliquer l'animation de position (seulement si on se déplace)
+            if (isMovingToPlanet) {
+                transform.position = Vector3.Lerp(startPosition, targetPosition, smoothProgress);
+            }
+            // Si isPointingToPlanet, on ne bouge pas la position
+            
+            // Préserver le zoom actuel - ne pas changer la distance
+            // La distance reste celle de la position de départ
             
             // Appliquer l'animation de rotation (sauf si en orientation libre)
             if (isFreeLooking) {
@@ -421,13 +409,14 @@ namespace HexasphereProcedural {
                 transform.rotation = Quaternion.Lerp(startRotation, targetRotationAnimation, smoothProgress);
             }
             
+            // S'assurer que la rotation finale est bien appliquée à la fin
+            if (progress >= 0.99f && !isFreeLooking) {
+                transform.rotation = targetRotationAnimation;
+            }
+            
             // Garder le nord en haut si activé
             if (keepNorthUp) {
                 KeepNorthUp();
-            }
-            
-            if (showDebugInfo && Time.frameCount % 30 == 0) { // Log toutes les 30 frames
-                Debug.Log($"🎬 Animation: Progress={progress:F2}, Position={transform.position:F2}, Rotation={transform.rotation.eulerAngles:F1}");
             }
         }
         
@@ -435,13 +424,11 @@ namespace HexasphereProcedural {
             // Permettre l'orientation libre pendant l'animation
             if (Input.GetMouseButton(0) && hasSelectedPlanet) {
                 if (!isFreeLooking) {
-                    Debug.Log("🔄 Début orientation libre pendant animation");
                     StartFreeLook();
                 }
                 UpdateFreeLook();
             }
             if (Input.GetMouseButtonUp(0) && isFreeLooking) {
-                Debug.Log("🔄 Fin orientation libre pendant animation");
                 StopFreeLook();
             }
         }
@@ -450,7 +437,6 @@ namespace HexasphereProcedural {
         void StartOrbiting() {
             isOrbiting = true;
             lastMousePosition = Input.mousePosition;
-            Debug.Log("🔄 Début de l'orbite autour de la planète");
         }
         
         void UpdateOrbiting() {
@@ -471,33 +457,26 @@ namespace HexasphereProcedural {
             // Limiter la rotation verticale pour éviter le retournement
             targetRotation.x = Mathf.Clamp(targetRotation.x, -80f, 80f);
             
-            Debug.Log($"🔄 Orbite: Y={yRotation:F3}, X={xRotation:F3}, Target={targetRotation:F1}");
-            
             lastMousePosition = Input.mousePosition;
         }
         
         void StopOrbiting() {
             isOrbiting = false;
-            Debug.Log("🔄 Fin de l'orbite autour de la planète");
         }
         
         // ===== ORIENTATION LIBRE SUR PLACE =====
         void StartFreeLook() {
             if (!hasSelectedPlanet) {
-                Debug.Log("❌ StartFreeLook: Pas de planète sélectionnée");
                 return;
             }
             
-            Debug.Log("🔄 StartFreeLook: Début orientation libre");
             isFreeLooking = true;
             lastMousePosition = Input.mousePosition;
             freeLookRotation = transform.rotation; // Sauvegarder la rotation actuelle
-            Debug.Log($"🔄 StartFreeLook: Rotation initiale: {freeLookRotation.eulerAngles}");
         }
         
         void UpdateFreeLook() {
             if (!isFreeLooking) {
-                Debug.Log("❌ UpdateFreeLook: Pas en mode orientation libre");
                 return;
             }
             
@@ -511,15 +490,12 @@ namespace HexasphereProcedural {
             
             // Appliquer la rotation libre à la caméra
             freeLookRotation *= Quaternion.Euler(xRotation, yRotation, 0f);
-            
-            Debug.Log($"🔄 UpdateFreeLook: Delta=({mouseDelta.x:F1}, {mouseDelta.y:F1}), Rot=({xRotation:F3}, {yRotation:F3}), Final={freeLookRotation.eulerAngles}");
-            
+                     
             lastMousePosition = Input.mousePosition;
         }
         
         void StopFreeLook() {
             isFreeLooking = false;
-            Debug.Log("🔄 Fin de l'orientation libre");
         }
         
         // Méthodes de drag supprimées - remplacées par l'orientation libre
@@ -534,14 +510,11 @@ namespace HexasphereProcedural {
         void UpdateCamera() {
             // Si pas de planète sélectionnée, laisser la caméra libre
             if (!hasSelectedPlanet || targetPlanet == null) {
-                if (showDebugInfo && Time.frameCount % 60 == 0) { // Log toutes les 60 frames
-                    Debug.Log($"📷 Caméra libre - hasSelectedPlanet: {hasSelectedPlanet}, targetPlanet: {(targetPlanet != null ? "OK" : "NULL")}");
-                }
                 return;
             }
             
-            // Gérer l'animation vers la planète
-            if (isMovingToPlanet) {
+            // Gérer l'animation vers la planète (déplacement ou pointage)
+            if (isMovingToPlanet || isPointingToPlanet) {
                 UpdateCameraMoveToPlanet();
                 // Permettre les contrôles de rotation pendant l'animation
                 HandleRotationDuringAnimation();
@@ -557,7 +530,6 @@ namespace HexasphereProcedural {
             // Gérer les différents modes de caméra
             if (isFreeLooking) {
                 // Mode orientation libre : pas de changement de position, seulement rotation
-                Debug.Log($"🔄 UpdateCamera: Application rotation libre: {freeLookRotation.eulerAngles}");
                 transform.rotation = freeLookRotation;
             } else {
                 // Mode orbite ou normal : calculer la position autour de la planète
@@ -581,7 +553,6 @@ namespace HexasphereProcedural {
             
             // Log de debug pour la position
             if (showDebugInfo && Time.frameCount % 120 == 0) { // Log toutes les 120 frames
-                Debug.Log($"📷 Caméra - Position: {transform.position}, Distance: {currentDistance:F2}, Rotation: {currentRotation:F1}");
             }
         }
         
@@ -601,7 +572,6 @@ namespace HexasphereProcedural {
             targetRotation = Vector3.zero;
             targetDistance = defaultDistance;
             
-            Debug.Log("🔄 Caméra réinitialisée");
         }
         
         void FocusOnPlanet() {
@@ -611,7 +581,6 @@ namespace HexasphereProcedural {
             Vector3 direction = (planetCenter - transform.position).normalized;
             targetRotation = Quaternion.LookRotation(direction).eulerAngles;
             
-            Debug.Log("🎯 Focus sur la planète");
         }
         
         void SetupInitialCamera() {
@@ -647,7 +616,6 @@ namespace HexasphereProcedural {
                 // Le tag "Planet" n'existe pas, continuer sans erreur
             }
             
-            Debug.LogWarning("❌ Aucune planète trouvée. Créez d'abord une planète avec HexaAstralithPlanet.");
         }
         
         void OnGUI() {
@@ -686,6 +654,9 @@ namespace HexasphereProcedural {
             if (GUILayout.Button("Durée: " + animationDuration.ToString("F1") + "s")) {
                 animationDuration = animationDuration >= 2f ? 0.5f : animationDuration + 0.5f;
             }
+            if (GUILayout.Button("Range: " + acceptableDistanceRange.ToString("F1"))) {
+                acceptableDistanceRange = acceptableDistanceRange >= 5f ? 1f : acceptableDistanceRange + 1f;
+            }
             if (GUILayout.Button("Vitesse: " + cameraMoveSpeed.ToString("F1"))) {
                 cameraMoveSpeed = cameraMoveSpeed >= 5f ? 1f : cameraMoveSpeed + 1f;
             }
@@ -698,6 +669,7 @@ namespace HexasphereProcedural {
             GUILayout.Label($"FreeLook: {(isFreeLooking ? "ON" : "OFF")}");
             GUILayout.Label($"Clicking: {(isClicking ? "ON" : "OFF")}");
             GUILayout.Label($"Moving: {(isMovingToPlanet ? "ON" : "OFF")}");
+            GUILayout.Label($"Pointing: {(isPointingToPlanet ? "ON" : "OFF")}");
             GUILayout.Label($"Planète: {(hasSelectedPlanet ? "Sélectionnée" : "Aucune")}");
             
             GUILayout.EndVertical();
