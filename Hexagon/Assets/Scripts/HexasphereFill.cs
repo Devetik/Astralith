@@ -32,6 +32,31 @@ public class HexasphereFill : MonoBehaviour {
     [SerializeField] public Color focusPointColor = Color.red; // Couleur du point de focus
     [SerializeField] public float focusPointSize = 0.1f; // Taille du point de focus
     
+    [Header("🔄 Subdivision Dynamique")]
+    [SerializeField] public bool useDynamicSubdivision = true; // Subdivision dynamique
+    [SerializeField] public Transform dynamicFocusTarget; // Cible pour la focalisation dynamique
+    [SerializeField] public float updateThreshold = 0.1f; // Seuil de mise à jour
+    [SerializeField] public float updateInterval = 0.5f; // Intervalle de mise à jour (secondes)
+    [SerializeField] public bool smoothTransition = true; // Transition douce
+    [SerializeField] public float transitionSpeed = 2f; // Vitesse de transition
+    [SerializeField] public bool autoRegenerate = true; // Régénération automatique
+    [SerializeField] public bool showDynamicDebug = false; // Debug de la subdivision dynamique
+    [SerializeField] public bool continuousUpdate = false; // Mise à jour continue (ignore les seuils)
+    
+    [Header("🎯 Subdivision Automatique")]
+    [SerializeField] public bool useAutoSubdivision = true; // Subdivision automatique basée sur la proximité
+    [SerializeField] public float autoSubdivisionRadius = 0.3f; // Rayon de subdivision automatique
+    [SerializeField] public int maxAutoSubdivisions = 3; // Nombre maximum de subdivisions automatiques
+    [SerializeField] public float subdivisionThreshold = 0.1f; // Seuil pour déclencher la subdivision
+    [SerializeField] public float updateCooldown = 0.1f; // Cooldown entre les mises à jour (secondes)
+    [SerializeField] public bool showAutoSubdivisionDebug = false; // Debug de la subdivision automatique
+    
+    [Header("🔄 Réduction Automatique")]
+    [SerializeField] public bool useAutoReduction = true; // Réduction automatique des subdivisions
+    [SerializeField] public float reductionRadius = 0.5f; // Rayon au-delà duquel réduire les subdivisions
+    [SerializeField] public float reductionThreshold = 0.2f; // Seuil pour déclencher la réduction
+    [SerializeField] public bool showReductionDebug = false; // Debug de la réduction
+    
     // Variables internes
     private MeshRenderer meshRenderer;
     private MeshFilter meshFilter;
@@ -51,6 +76,18 @@ public class HexasphereFill : MonoBehaviour {
     // Variables pour le point de focus
     private GameObject focusPointObject;
     private MeshRenderer focusPointRenderer;
+    
+    // Variables pour la subdivision dynamique
+    private Vector3 lastFocusPoint;
+    private float lastUpdateTime;
+    private bool isUpdating = false;
+    private Vector3 targetFocusPoint;
+    private Vector3 currentFocusPoint;
+    
+    // Variables pour la subdivision automatique
+    private float lastAverageDistance = 0f; // Distance moyenne précédente
+    private int lastDivisions = 0; // Nombre de divisions précédent
+    private float lastAutoUpdateTime = 0f; // Temps de la dernière mise à jour automatique
     
     void Start() {
         meshRenderer = GetComponent<MeshRenderer>();
@@ -74,6 +111,38 @@ public class HexasphereFill : MonoBehaviour {
         
         // Créer le point de focus visible
         CreateFocusPoint();
+        
+        // Initialiser la subdivision dynamique
+        InitializeDynamicSubdivision();
+        
+        // Initialiser la subdivision automatique
+        InitializeAutoSubdivision();
+    }
+    
+    void InitializeDynamicSubdivision() {
+        // Initialiser les variables de subdivision dynamique
+        lastFocusPoint = focusPoint;
+        currentFocusPoint = focusPoint;
+        targetFocusPoint = focusPoint;
+        lastUpdateTime = 0f;
+        isUpdating = false;
+        
+        // Trouver automatiquement la caméra principale si pas de cible assignée
+        if (dynamicFocusTarget == null) {
+            Camera mainCamera = Camera.main;
+            if (mainCamera != null) {
+                dynamicFocusTarget = mainCamera.transform;
+                Debug.Log("🔄 Cible dynamique automatique: Camera principale");
+            } else {
+                Debug.LogWarning("🔄 Aucune caméra principale trouvée. Assignez manuellement dynamicFocusTarget.");
+            }
+        }
+    }
+    
+    void InitializeAutoSubdivision() {
+        // Initialiser les variables de subdivision automatique
+        lastAverageDistance = 0f;
+        lastDivisions = divisions;
     }
     
     void Update() {
@@ -83,6 +152,21 @@ public class HexasphereFill : MonoBehaviour {
         
         // Mettre à jour le point de focus
         UpdateFocusPoint();
+        
+        // Gérer la subdivision dynamique
+        if (useDynamicSubdivision && useSelectiveSubdivision) {
+            UpdateDynamicSubdivision();
+        }
+        
+        // Gérer la subdivision automatique (indépendante de useSelectiveSubdivision)
+        if (useAutoSubdivision) {
+            if (showAutoSubdivisionDebug) {
+                Debug.Log("🎯 Appel UpdateAutoSubdivision");
+            }
+            UpdateAutoSubdivision();
+        } else if (showAutoSubdivisionDebug) {
+            Debug.Log("🎯 Subdivision automatique désactivée");
+        }
     }
     
     public void GenerateHexasphere() {
@@ -235,12 +319,18 @@ public class HexasphereFill : MonoBehaviour {
     }
     
     bool IsTriangleInFocus(Triangle triangle) {
-        // Calculer le centre du triangle
+        // Calculer le centre du triangle (normalisé sur la sphère)
         Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+        center = center.normalized; // S'assurer que c'est sur la sphère
         
-        // Vérifier si le centre est dans la zone de focus
-        float distance = Vector3.Distance(center, focusPoint);
-        return distance <= focusRadius;
+        // Calculer l'angle entre le centre du triangle et le point de focus
+        float angle = Vector3.Angle(center, focusPoint);
+        
+        // Convertir l'angle en distance angulaire (en radians)
+        float angularDistance = angle * Mathf.Deg2Rad;
+        
+        // Vérifier si le triangle est dans la zone de focus
+        return angularDistance <= focusRadius;
     }
     
     void NormalizeAllPoints() {
@@ -339,6 +429,193 @@ public class HexasphereFill : MonoBehaviour {
             }
         }
     }
+    
+    void UpdateDynamicSubdivision() {
+        if (dynamicFocusTarget == null) return;
+        
+        // Calculer le nouveau point de focus basé sur la cible
+        Vector3 targetPosition = dynamicFocusTarget.position;
+        Vector3 directionToTarget = (targetPosition - transform.position).normalized;
+        Vector3 newFocusPoint = directionToTarget;
+        
+        // Vérifier si le point de focus a changé significativement
+        float distanceChange = Vector3.Distance(newFocusPoint, lastFocusPoint);
+        bool shouldUpdate = continuousUpdate || (distanceChange > updateThreshold);
+        
+        // Vérifier l'intervalle de temps
+        bool timeToUpdate = continuousUpdate || (Time.time - lastUpdateTime > updateInterval);
+        
+        if (shouldUpdate && timeToUpdate && !isUpdating) {
+            // Démarrer la mise à jour
+            isUpdating = true;
+            targetFocusPoint = newFocusPoint;
+            lastUpdateTime = Time.time;
+            
+            Debug.Log($"🔄 Mise à jour dynamique: Distance = {distanceChange:F3}");
+            
+            // Régénérer immédiatement si autoRegenerate est activé
+            if (autoRegenerate) {
+                focusPoint = targetFocusPoint;
+                currentFocusPoint = targetFocusPoint;
+                RegenerateMeshWithNewFocus();
+                isUpdating = false;
+            }
+        }
+        
+        // Transition douce vers le nouveau point de focus (seulement si pas déjà traité)
+        if (isUpdating && !autoRegenerate) {
+            if (smoothTransition) {
+                // Transition douce
+                currentFocusPoint = Vector3.Lerp(currentFocusPoint, targetFocusPoint, transitionSpeed * Time.deltaTime);
+                focusPoint = currentFocusPoint;
+                
+                // Vérifier si la transition est terminée
+                if (Vector3.Distance(currentFocusPoint, targetFocusPoint) < 0.01f) {
+                    focusPoint = targetFocusPoint;
+                    currentFocusPoint = targetFocusPoint;
+                    isUpdating = false;
+                }
+            } else {
+                // Transition instantanée
+                focusPoint = targetFocusPoint;
+                currentFocusPoint = targetFocusPoint;
+                isUpdating = false;
+            }
+        }
+        
+        // Mettre à jour le point de focus précédent
+        lastFocusPoint = newFocusPoint;
+    }
+    
+    void RegenerateMeshWithNewFocus() {
+        // Vérifier si le point de focus a vraiment changé
+        if (Vector3.Distance(focusPoint, lastFocusPoint) < 0.001f) {
+            return; // Pas de changement significatif, pas besoin de régénérer
+        }
+        
+        // Nettoyer les anciens chunks avant de régénérer
+        CleanupOldChunks();
+        
+        // Régénérer la géométrie complète avec le nouveau point de focus
+        RegenerateGeometryWithFocus();
+        
+        Debug.Log($"🔄 Mesh régénéré avec focus: {focusPoint}");
+    }
+    
+    void RegenerateGeometryWithFocus() {
+        // Régénérer la géométrie de base avec le nouveau point de focus
+        CreateIcosahedron();
+        ApplySubdivisions();
+        
+        // Régénérer le mesh
+        if (useChunking) {
+            GenerateMeshWithChunking();
+        } else {
+            GenerateMeshSingle();
+        }
+    }
+    
+    void UpdateAutoSubdivision() {
+        if (dynamicFocusTarget == null) {
+            Debug.LogWarning("🎯 Aucune cible dynamique assignée - Subdivision automatique désactivée");
+            return;
+        }
+        
+        // Vérifier le cooldown pour éviter les mises à jour trop fréquentes
+        if (Time.time - lastAutoUpdateTime < updateCooldown) {
+            return;
+        }
+        
+        // Calculer le point de focus actuel
+        Vector3 targetPosition = dynamicFocusTarget.position;
+        Vector3 directionToTarget = (targetPosition - transform.position).normalized;
+        
+        if (showAutoSubdivisionDebug) {
+            Debug.Log($"🎯 Mise à jour subdivision automatique - Cible: {dynamicFocusTarget.name}");
+        }
+        
+        // Calculer la distance moyenne de tous les triangles
+        float averageDistance = 0f;
+        int triangleCount = 0;
+        
+        foreach (var triangle in triangles) {
+            float distance = GetTriangleDistanceFromFocus(triangle, directionToTarget);
+            averageDistance += distance;
+            triangleCount++;
+        }
+        
+        if (triangleCount > 0) {
+            averageDistance /= triangleCount;
+        }
+        
+        if (showAutoSubdivisionDebug) {
+            Debug.Log($"🎯 Distance moyenne: {averageDistance:F3}, Triangles: {triangleCount}");
+        }
+        
+        // Déterminer le niveau de subdivision basé sur la distance moyenne
+        int targetDivisions = divisions;
+        
+        if (averageDistance <= autoSubdivisionRadius) {
+            // Proche - augmenter les subdivisions
+            targetDivisions = Mathf.Min(divisions + 1, maxAutoSubdivisions);
+            if (showAutoSubdivisionDebug) {
+                Debug.Log($"🎯 Proche - Augmenter subdivisions: {targetDivisions}");
+            }
+        } else if (averageDistance > reductionRadius && useAutoReduction) {
+            // Loin - réduire les subdivisions
+            targetDivisions = Mathf.Max(1, divisions - 1);
+            if (showAutoSubdivisionDebug) {
+                Debug.Log($"🎯 Loin - Réduire subdivisions: {targetDivisions}");
+            }
+        } else {
+            if (showAutoSubdivisionDebug) {
+                Debug.Log($"🎯 Zone neutre - Pas de changement: {targetDivisions}");
+            }
+        }
+        
+        // Si le niveau de subdivision a changé et que le changement est significatif, régénérer le mesh
+        if (targetDivisions != divisions && Mathf.Abs(averageDistance - lastAverageDistance) > subdivisionThreshold) {
+            divisions = targetDivisions;
+            lastDivisions = divisions;
+            lastAverageDistance = averageDistance;
+            
+            Debug.Log($"🎯 Changement de subdivision: {divisions} divisions (distance moyenne: {averageDistance:F3})");
+            
+            // Mettre à jour le temps de la dernière mise à jour
+            lastAutoUpdateTime = Time.time;
+            
+            // Régénérer la géométrie complète avec le nouveau niveau de subdivision
+            RegenerateGeometryWithFocus();
+        } else if (showAutoSubdivisionDebug) {
+            Debug.Log($"🎯 Pas de changement - Divisions: {divisions}, Distance: {averageDistance:F3}, Seuil: {subdivisionThreshold:F3}");
+        }
+    }
+    
+    bool IsTriangleInAutoSubdivisionZone(Triangle triangle, Vector3 focusDirection) {
+        // Calculer le centre du triangle
+        Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+        center = center.normalized;
+        
+        // Calculer l'angle entre le centre du triangle et le point de focus
+        float angle = Vector3.Angle(center, focusDirection);
+        float angularDistance = angle * Mathf.Deg2Rad;
+        
+        // Vérifier si le triangle est dans la zone de subdivision automatique
+        return angularDistance <= autoSubdivisionRadius;
+    }
+    
+    float GetTriangleDistanceFromFocus(Triangle triangle, Vector3 focusDirection) {
+        // Calculer le centre du triangle
+        Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+        center = center.normalized;
+        
+        // Calculer l'angle entre le centre du triangle et le point de focus
+        float angle = Vector3.Angle(center, focusDirection);
+        float angularDistance = angle * Mathf.Deg2Rad;
+        
+        return angularDistance;
+    }
+    
     
     void GenerateMeshSingle() {
         List<Vector3> vertices = new List<Vector3>();
@@ -693,13 +970,119 @@ public class HexasphereFill : MonoBehaviour {
             showFocusPoint = !showFocusPoint;
         }
         
+        if (GUILayout.Button("🔄 Toggle Dynamic Subdivision")) {
+            useDynamicSubdivision = !useDynamicSubdivision;
+            if (useDynamicSubdivision) {
+                // Initialiser les variables de subdivision dynamique
+                lastFocusPoint = focusPoint;
+                currentFocusPoint = focusPoint;
+                targetFocusPoint = focusPoint;
+            }
+        }
+        
+        if (useDynamicSubdivision && GUILayout.Button("🔄 Regenerate with Current Focus")) {
+            RegenerateMeshWithNewFocus();
+        }
+        
+        if (useDynamicSubdivision && GUILayout.Button("🔄 Force Update Focus")) {
+            // Forcer la mise à jour du point de focus
+            if (dynamicFocusTarget != null) {
+                Vector3 targetPosition = dynamicFocusTarget.position;
+                Vector3 directionToTarget = (targetPosition - transform.position).normalized;
+                focusPoint = directionToTarget;
+                RegenerateMeshWithNewFocus();
+                Debug.Log($"🔄 Focus forcé: {focusPoint}");
+            }
+        }
+        
+        if (useDynamicSubdivision && GUILayout.Button("🔍 Toggle Dynamic Debug")) {
+            showDynamicDebug = !showDynamicDebug;
+        }
+        
+        if (useDynamicSubdivision && GUILayout.Button("⚡ Toggle Continuous Update")) {
+            continuousUpdate = !continuousUpdate;
+        }
+        
+        if (GUILayout.Button("🎯 Toggle Auto Subdivision")) {
+            useAutoSubdivision = !useAutoSubdivision;
+            if (useAutoSubdivision) {
+                // Réinitialiser les variables de subdivision
+                lastAverageDistance = 0f;
+                lastDivisions = divisions;
+            }
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🎯 Reset Auto Subdivision")) {
+            lastAverageDistance = 0f;
+            lastDivisions = divisions;
+            GenerateHexasphere();
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🔍 Toggle Auto Debug")) {
+            showAutoSubdivisionDebug = !showAutoSubdivisionDebug;
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🎯 Activate Auto Debug")) {
+            showAutoSubdivisionDebug = true;
+            Debug.Log("🎯 Debug automatique activé");
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🎯 Force Auto Update")) {
+            UpdateAutoSubdivision();
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🔄 Toggle Auto Reduction")) {
+            useAutoReduction = !useAutoReduction;
+        }
+        
+        if (useAutoSubdivision && GUILayout.Button("🔍 Toggle Reduction Debug")) {
+            showReductionDebug = !showReductionDebug;
+        }
+        
         GUILayout.Label($"Selective Subdivision: {(useSelectiveSubdivision ? "ON" : "OFF")}");
+        GUILayout.Label($"Dynamic Subdivision: {(useDynamicSubdivision ? "ON" : "OFF")}");
         GUILayout.Label($"Focus Point: {focusPoint}");
         GUILayout.Label($"Focus Radius: {focusRadius:F2}");
         GUILayout.Label($"Focus Divisions: {focusDivisions}");
         GUILayout.Label($"Background Divisions: {backgroundDivisions}");
         GUILayout.Label($"Focus Debug: {(showFocusDebug ? "ON" : "OFF")}");
         GUILayout.Label($"Focus Point Visible: {(showFocusPoint ? "ON" : "OFF")}");
+        
+        if (useAutoSubdivision) {
+            GUILayout.Label($"Auto Subdivision: {(useAutoSubdivision ? "ON" : "OFF")}");
+            GUILayout.Label($"Auto Radius: {autoSubdivisionRadius:F2}");
+            GUILayout.Label($"Max Auto Subdivisions: {maxAutoSubdivisions}");
+            GUILayout.Label($"Current Divisions: {divisions}");
+            GUILayout.Label($"Total Triangles: {triangles.Count}");
+            
+            if (useAutoReduction) {
+                GUILayout.Label($"Auto Reduction: {(useAutoReduction ? "ON" : "OFF")}");
+                GUILayout.Label($"Reduction Radius: {reductionRadius:F2}");
+            }
+            
+            if (showAutoSubdivisionDebug) {
+                GUILayout.Label($"Last Average Distance: {lastAverageDistance:F3}");
+                GUILayout.Label($"Last Divisions: {lastDivisions}");
+            }
+        }
+        
+        if (useDynamicSubdivision) {
+            GUILayout.Label($"Dynamic Target: {(dynamicFocusTarget != null ? dynamicFocusTarget.name : "None")}");
+            GUILayout.Label($"Update Threshold: {updateThreshold:F2}");
+            GUILayout.Label($"Update Interval: {updateInterval:F1}s");
+            GUILayout.Label($"Smooth Transition: {(smoothTransition ? "ON" : "OFF")}");
+            GUILayout.Label($"Transition Speed: {transitionSpeed:F1}");
+            GUILayout.Label($"Auto Regenerate: {(autoRegenerate ? "ON" : "OFF")}");
+            GUILayout.Label($"Continuous Update: {(continuousUpdate ? "ON" : "OFF")}");
+            GUILayout.Label($"Is Updating: {(isUpdating ? "YES" : "NO")}");
+            
+            if (showDynamicDebug) {
+                GUILayout.Label($"Last Focus: {lastFocusPoint}");
+                GUILayout.Label($"Current Focus: {currentFocusPoint}");
+                GUILayout.Label($"Target Focus: {targetFocusPoint}");
+                GUILayout.Label($"Distance Change: {Vector3.Distance(focusPoint, lastFocusPoint):F3}");
+            }
+        }
         
         GUILayout.EndVertical();
         GUILayout.EndArea();

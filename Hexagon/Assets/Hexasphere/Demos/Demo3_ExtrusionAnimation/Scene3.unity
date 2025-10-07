@@ -654,7 +654,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1129399816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -674,6 +674,30 @@ MonoBehaviour:
   showWireframe: 0
   fixTriangleOrientation: 1
   useSphericalUVs: 1
+  useChunking: 1
+  maxVerticesPerChunk: 65500
+  maxChunks: 100
+  useLOD: 0
+  lodDistance: 10
+  lodCamera: {fileID: 0}
+  useVisibilityLOD: 0
+  visibilityAngle: 90
+  frontLODDivisions: 5
+  backLODDivisions: 1
+  useFrustumCulling: 1
+  useOptimizedVisibility: 1
+  visibilityUpdateInterval: 5
+  useFrustumCone: 1
+  frustumNearDistance: 0.1
+  frustumFarDistance: 1000
+  frustumAspectRatio: 1
+  showFrustumDebug: 0
+  useSectorLOD: 0
+  sectorCount: 12
+  highLODSectors: 4
+  mediumLODSectors: 4
+  lowLODSectors: 4
+  showSectorDebug: 0
   hexagonMaterial: {fileID: 2100000, guid: a0a9fe1ad2a821d42aafb9412a87d1bb, type: 2}
   hexagonColor: {r: 0, g: 0, b: 1, a: 1}
 --- !u!4 &1129399817
@@ -686,6 +710,89 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -7.16, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1379864727
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1379864729}
+  - component: {fileID: 1379864728}
+  m_Layer: 0
+  m_Name: FillHexa
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1379864728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379864727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 705339d84aacbad4791da324596944fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  divisions: 3
+  radius: 1
+  generateOnStart: 1
+  showDebugInfo: 1
+  showWireframe: 0
+  hexagonMaterial: {fileID: 0}
+  hexagonColor: {r: 0, g: 0, b: 1, a: 1}
+  fixTriangleOrientation: 1
+  useSphericalUVs: 1
+  useChunking: 1
+  maxVerticesPerChunk: 65000
+  maxChunks: 100
+  useSelectiveSubdivision: 1
+  focusPoint: {x: 0, y: 0, z: 3.06}
+  focusRadius: 0.5
+  focusDivisions: 5
+  backgroundDivisions: 1
+  showFocusDebug: 0
+  showFocusPoint: 1
+  focusPointColor: {r: 1, g: 0, b: 0, a: 1}
+  focusPointSize: 0.1
+  useDynamicSubdivision: 1
+  dynamicFocusTarget: {fileID: 0}
+  updateThreshold: 0.1
+  updateInterval: 0.5
+  smoothTransition: 1
+  transitionSpeed: 2
+  autoRegenerate: 1
+  showDynamicDebug: 0
+  continuousUpdate: 1
+  useAutoSubdivision: 0
+  autoSubdivisionRadius: 0.3
+  maxAutoSubdivisions: 3
+  subdivisionThreshold: 0.1
+  showAutoSubdivisionDebug: 0
+  useAutoReduction: 1
+  reductionRadius: 0.5
+  reductionThreshold: 0.2
+  showReductionDebug: 0
+--- !u!4 &1379864729
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379864727}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 1.263}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1003,3 +1110,4 @@ SceneRoots:
   - {fileID: 993790995}
   - {fileID: 896646341}
   - {fileID: 1129399817}
+  - {fileID: 1379864729}
