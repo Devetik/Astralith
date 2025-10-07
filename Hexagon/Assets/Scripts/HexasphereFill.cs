@@ -291,8 +291,10 @@ public class HexasphereFill : MonoBehaviour {
             // Configurer le renderer
             focusPointRenderer = focusPointObject.GetComponent<MeshRenderer>();
             if (focusPointRenderer != null) {
+                // Créer un matériau transparent pour la sphère
                 Material focusMaterial = new Material(Shader.Find("Standard"));
-                focusMaterial.color = focusPointColor;
+                
+                // Configuration pour la transparence
                 focusMaterial.SetFloat("_Mode", 3); // Mode transparent
                 focusMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
                 focusMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
@@ -301,6 +303,12 @@ public class HexasphereFill : MonoBehaviour {
                 focusMaterial.EnableKeyword("_ALPHABLEND_ON");
                 focusMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
                 focusMaterial.renderQueue = 3000;
+                
+                // Couleur transparente
+                Color transparentColor = focusPointColor;
+                transparentColor.a = 0.3f; // 30% d'opacité
+                focusMaterial.color = transparentColor;
+                
                 focusPointRenderer.material = focusMaterial;
             }
         }
@@ -316,11 +324,18 @@ public class HexasphereFill : MonoBehaviour {
             focusPointObject.transform.localScale = Vector3.one * focusPointSize;
             
             // Afficher/masquer selon les paramètres
-            focusPointObject.SetActive(showFocusPoint && useSelectiveSubdivision);
+            // Visible seulement dans la scène, pas en simulation
+            bool shouldShow = showFocusPoint && useSelectiveSubdivision;
+            if (Application.isPlaying) {
+                shouldShow = false; // Masquer en simulation
+            }
+            focusPointObject.SetActive(shouldShow);
             
-            // Mettre à jour la couleur
+            // Mettre à jour la couleur avec transparence
             if (focusPointRenderer != null) {
-                focusPointRenderer.material.color = focusPointColor;
+                Color transparentColor = focusPointColor;
+                transparentColor.a = 0.3f; // 30% d'opacité
+                focusPointRenderer.material.color = transparentColor;
             }
         }
     }
@@ -694,6 +709,28 @@ public class HexasphereFill : MonoBehaviour {
         if (showFocusDebug && useSelectiveSubdivision) {
             DrawFocusDebug();
         }
+    }
+    
+    void OnDrawGizmosSelected() {
+        // Dessiner le point de focus dans la scène
+        if (showFocusPoint && useSelectiveSubdivision) {
+            DrawFocusPointGizmo();
+        }
+    }
+    
+    void DrawFocusPointGizmo() {
+        // Dessiner la sphère de focus
+        Gizmos.color = new Color(focusPointColor.r, focusPointColor.g, focusPointColor.b, 0.3f);
+        Vector3 worldPosition = transform.TransformPoint(focusPoint * radius);
+        Gizmos.DrawWireSphere(worldPosition, focusRadius * radius);
+        
+        // Dessiner le point central
+        Gizmos.color = focusPointColor;
+        Gizmos.DrawWireSphere(worldPosition, focusPointSize);
+        
+        // Dessiner une ligne du centre vers le point de focus
+        Gizmos.color = Color.white;
+        Gizmos.DrawLine(transform.position, worldPosition);
     }
     
     void DrawFocusDebug() {
