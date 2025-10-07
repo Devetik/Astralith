@@ -23,6 +23,30 @@ namespace HexasphereTest {
         [SerializeField] public float lodDistance = 10f;
         [SerializeField] public Camera lodCamera;
         
+        [Header("👁️ LOD Visibilité")]
+        [SerializeField] public bool useVisibilityLOD = false;
+        [SerializeField] public float visibilityAngle = 90f; // Angle de visibilité en degrés
+        [SerializeField] public int frontLODDivisions = 5; // Divisions pour la face visible
+        [SerializeField] public int backLODDivisions = 1; // Divisions pour la face cachée
+        [SerializeField] public bool useFrustumCulling = true;
+        [SerializeField] public bool useOptimizedVisibility = true; // Utiliser la version optimisée
+        [SerializeField] public int visibilityUpdateInterval = 5; // Mettre à jour tous les N frames
+        
+        [Header("🔺 Frustum Culling")]
+        [SerializeField] public bool useFrustumCone = true; // Utiliser un cône de frustum
+        [SerializeField] public float frustumNearDistance = 0.1f; // Distance proche du frustum
+        [SerializeField] public float frustumFarDistance = 1000f; // Distance lointaine du frustum
+        [SerializeField] public float frustumAspectRatio = 1.0f; // Ratio d'aspect du frustum
+        [SerializeField] public bool showFrustumDebug = false; // Afficher le frustum en debug
+        
+        [Header("🗺️ LOD par Secteurs")]
+        [SerializeField] public bool useSectorLOD = false; // Utiliser le LOD par secteurs
+        [SerializeField] public int sectorCount = 12; // Nombre de secteurs (12 pour dodécaèdre)
+        [SerializeField] public int highLODSectors = 4; // Nombre de secteurs en LOD élevé
+        [SerializeField] public int mediumLODSectors = 4; // Nombre de secteurs en LOD moyen
+        [SerializeField] public int lowLODSectors = 4; // Nombre de secteurs en LOD bas
+        [SerializeField] public bool showSectorDebug = false; // Afficher les secteurs en debug
+        
         [Header("🎨 Matériaux")]
         [SerializeField] public Material hexagonMaterial;
         [SerializeField] public Color hexagonColor = Color.blue;
@@ -49,6 +73,20 @@ namespace HexasphereTest {
         private int currentLODDivisions;
         private float lastLODDistance = -1f;
         
+        // Variables LOD Visibilité
+        private Dictionary<Point, bool> pointVisibility = new Dictionary<Point, bool>();
+        private Dictionary<Triangle, bool> triangleVisibility = new Dictionary<Triangle, bool>();
+        private Vector3 lastCameraPosition;
+        private Quaternion lastCameraRotation;
+        private int frameCounter = 0;
+        
+        // Variables LOD par Secteurs
+        private Dictionary<Point, int> pointSectors = new Dictionary<Point, int>();
+        private Dictionary<Triangle, int> triangleSectors = new Dictionary<Triangle, int>();
+        private Dictionary<int, bool> sectorVisibility = new Dictionary<int, bool>();
+        private Dictionary<int, int> sectorLODLevel = new Dictionary<int, int>();
+        private Vector3[] sectorCenters = new Vector3[12]; // Centres des 12 secteurs
+        
         void Start() {
             meshRenderer = GetComponent<MeshRenderer>();
             meshFilter = GetComponent<MeshFilter>();
@@ -59,6 +97,14 @@ namespace HexasphereTest {
             if (meshFilter == null) {
                 meshFilter = gameObject.AddComponent<MeshFilter>();
             }
+            
+            // Ajouter le tag "Planet" à l'objet
+            if (gameObject.tag != "Planet") {
+                gameObject.tag = "Planet";
+            }
+            
+            // Initialiser les secteurs dodécaédriques
+            InitializeSectors();
             
             // Trouver automatiquement la caméra principale si pas assignée
             if (lodCamera == null) {
@@ -81,6 +127,16 @@ namespace HexasphereTest {
             // Mise à jour du LOD si activé
             if (useLOD && lodCamera != null) {
                 UpdateLOD();
+            }
+            
+            // Mise à jour du LOD de visibilité si activé
+            if (useVisibilityLOD && lodCamera != null) {
+                UpdateVisibilityLOD();
+            }
+            
+            // Mise à jour du LOD par secteurs si activé
+            if (useSectorLOD && lodCamera != null) {
+                UpdateSectorLOD();
             }
         }
         
@@ -518,6 +574,23 @@ namespace HexasphereTest {
                 meshFilter.mesh = null;
             }
             
+            // Nettoyer TOUS les enfants (chunks et autres)
+            List<Transform> childrenToDestroy = new List<Transform>();
+            for (int i = 0; i < transform.childCount; i++) {
+                Transform child = transform.GetChild(i);
+                if (child.name.Contains("Hexasphere Chunk") || 
+                    child.name.Contains("Hexasphere") ||
+                    child.name.Contains("Chunk")) {
+                    childrenToDestroy.Add(child);
+                }
+            }
+            
+            foreach (Transform child in childrenToDestroy) {
+                if (child != null) {
+                    DestroyImmediate(child.gameObject);
+                }
+            }
+            
             // Réinitialiser les variables
             chunkCount = 0;
             if (verticesChunks != null) {
@@ -572,6 +645,353 @@ namespace HexasphereTest {
                 GenerateHexasphere();
                 Debug.Log($"🎯 LOD mis à jour: Distance={distance:F1}, Divisions={targetDivisions}");
             }
+        }
+        
+        void UpdateVisibilityLOD() {
+            if (lodCamera == null) return;
+            
+            // Mise à jour basée sur l'intervalle de frames pour la performance
+            frameCounter++;
+            if (frameCounter < visibilityUpdateInterval) {
+                return;
+            }
+            frameCounter = 0;
+            
+            // Vérifier si la caméra a bougé significativement (seuils plus élevés pour la performance)
+            Vector3 currentCameraPosition = lodCamera.transform.position;
+            Quaternion currentCameraRotation = lodCamera.transform.rotation;
+            
+            bool cameraMoved = Vector3.Distance(currentCameraPosition, lastCameraPosition) > 1f || // Seuil plus élevé
+                              Quaternion.Angle(currentCameraRotation, lastCameraRotation) > 15f; // Seuil plus élevé
+            
+            if (cameraMoved) {
+                lastCameraPosition = currentCameraPosition;
+                lastCameraRotation = currentCameraRotation;
+                
+                // Utiliser la version optimisée ou normale selon la configuration
+                if (useOptimizedVisibility) {
+                    CalculateVisibilityOptimized();
+                } else {
+                    CalculateVisibility();
+                }
+                
+                // Régénérer le mesh avec LOD adaptatif
+                GenerateVisibilityLODMesh();
+                
+                Debug.Log($"👁️ LOD Visibilité mis à jour: Caméra bougée (frame {Time.frameCount})");
+            }
+        }
+        
+        void CalculateVisibility() {
+            if (lodCamera == null) return;
+            
+            // Direction de la caméra vers l'objet
+            Vector3 cameraToObject = (transform.position - lodCamera.transform.position).normalized;
+            Vector3 cameraForward = lodCamera.transform.forward;
+            
+            // Calculer l'angle de visibilité
+            float visibilityThreshold = Mathf.Cos(visibilityAngle * Mathf.Deg2Rad);
+            
+            // Analyser chaque point
+            foreach (var point in points.Values) {
+                Vector3 pointPosition = point.ToVector3();
+                Vector3 cameraToPoint = (pointPosition - lodCamera.transform.position).normalized;
+                
+                // Calculer le produit scalaire pour déterminer la visibilité
+                float dotProduct = Vector3.Dot(cameraForward, cameraToPoint);
+                bool isVisible = dotProduct > visibilityThreshold;
+                
+                pointVisibility[point] = isVisible;
+            }
+            
+            // Analyser chaque triangle
+            foreach (var triangle in triangles) {
+                // Un triangle est visible si au moins un de ses points est visible
+                bool isVisible = pointVisibility.ContainsKey(triangle.points[0]) && pointVisibility[triangle.points[0]] ||
+                                pointVisibility.ContainsKey(triangle.points[1]) && pointVisibility[triangle.points[1]] ||
+                                pointVisibility.ContainsKey(triangle.points[2]) && pointVisibility[triangle.points[2]];
+                
+                triangleVisibility[triangle] = isVisible;
+            }
+            
+            int visiblePoints = 0;
+            foreach (var isVisible in pointVisibility.Values) {
+                if (isVisible) visiblePoints++;
+            }
+            Debug.Log($"👁️ Visibilité calculée: {visiblePoints} points visibles");
+        }
+        
+        void CalculateVisibilityOptimized() {
+            if (lodCamera == null) return;
+            
+            if (useFrustumCone) {
+                CalculateVisibilityWithFrustum();
+            } else {
+                CalculateVisibilityWithAngle();
+            }
+        }
+        
+        void CalculateVisibilityWithFrustum() {
+            if (lodCamera == null) return;
+            
+            // Calculer le frustum de la caméra
+            Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(lodCamera);
+            
+            // Calculer la visibilité seulement pour un échantillon de points (performance)
+            int sampleRate = Mathf.Max(1, points.Count / 50); // Échantillonner 2% des points
+            int pointIndex = 0;
+            int visibleCount = 0;
+            
+            foreach (var point in points.Values) {
+                if (pointIndex % sampleRate == 0) {
+                    // Position corrigée : utiliser la position transformée de la sphère
+                    Vector3 pointPosition = transform.TransformPoint(point.ToVector3() * radius);
+                    bool isVisible = IsPointInFrustum(pointPosition, frustumPlanes);
+                    
+                    pointVisibility[point] = isVisible;
+                    if (isVisible) visibleCount++;
+                }
+                pointIndex++;
+            }
+            
+            // Estimer la visibilité des autres points basée sur les échantillons
+            foreach (var point in points.Values) {
+                if (!pointVisibility.ContainsKey(point)) {
+                    Vector3 pointPosition = transform.TransformPoint(point.ToVector3() * radius);
+                    bool isVisible = IsPointInFrustum(pointPosition, frustumPlanes);
+                    pointVisibility[point] = isVisible;
+                    if (isVisible) visibleCount++;
+                }
+            }
+            
+            // Calculer la visibilité des triangles
+            foreach (var triangle in triangles) {
+                bool isVisible = pointVisibility.ContainsKey(triangle.points[0]) && pointVisibility[triangle.points[0]] ||
+                                pointVisibility.ContainsKey(triangle.points[1]) && pointVisibility[triangle.points[1]] ||
+                                pointVisibility.ContainsKey(triangle.points[2]) && pointVisibility[triangle.points[2]];
+                
+                triangleVisibility[triangle] = isVisible;
+            }
+            
+            Debug.Log($"🔺 Frustum culling: {visibleCount} points visibles (échantillon {sampleRate})");
+        }
+        
+        void CalculateVisibilityWithAngle() {
+            if (lodCamera == null) return;
+            
+            // Version optimisée avec logique de visibilité corrigée
+            Vector3 cameraPosition = lodCamera.transform.position;
+            Vector3 cameraForward = lodCamera.transform.forward;
+            Vector3 objectCenter = transform.position;
+            
+            // Calculer la direction de la caméra vers le centre de l'objet
+            Vector3 cameraToCenter = (objectCenter - cameraPosition).normalized;
+            
+            // Calculer l'angle de visibilité (plus restrictif pour une sphère)
+            float visibilityThreshold = Mathf.Cos(visibilityAngle * Mathf.Deg2Rad);
+            
+            // Calculer la visibilité seulement pour un échantillon de points (performance)
+            int sampleRate = Mathf.Max(1, points.Count / 50); // Échantillonner 2% des points
+            int pointIndex = 0;
+            int visibleCount = 0;
+            
+            foreach (var point in points.Values) {
+                if (pointIndex % sampleRate == 0) {
+                    Vector3 pointPosition = point.ToVector3();
+                    Vector3 cameraToPoint = (pointPosition - cameraPosition).normalized;
+                    
+                    // Logique de visibilité corrigée pour une sphère
+                    float dotProduct = Vector3.Dot(cameraForward, cameraToPoint);
+                    bool isVisible = dotProduct > visibilityThreshold;
+                    
+                    // Vérification supplémentaire : le point doit être dans le champ de vision
+                    float angleToCenter = Vector3.Dot(cameraToCenter, cameraToPoint);
+                    if (angleToCenter < 0) {
+                        isVisible = false; // Point derrière le centre de l'objet
+                    }
+                    
+                    pointVisibility[point] = isVisible;
+                    if (isVisible) visibleCount++;
+                }
+                pointIndex++;
+            }
+            
+            // Estimer la visibilité des autres points basée sur les échantillons
+            foreach (var point in points.Values) {
+                if (!pointVisibility.ContainsKey(point)) {
+                    // Utiliser la visibilité du point le plus proche
+                    bool isVisible = EstimateVisibilityFromNeighbors(point, cameraPosition, cameraForward, visibilityThreshold);
+                    pointVisibility[point] = isVisible;
+                    if (isVisible) visibleCount++;
+                }
+            }
+            
+            // Calculer la visibilité des triangles
+            foreach (var triangle in triangles) {
+                bool isVisible = pointVisibility.ContainsKey(triangle.points[0]) && pointVisibility[triangle.points[0]] ||
+                                pointVisibility.ContainsKey(triangle.points[1]) && pointVisibility[triangle.points[1]] ||
+                                pointVisibility.ContainsKey(triangle.points[2]) && pointVisibility[triangle.points[2]];
+                
+                triangleVisibility[triangle] = isVisible;
+            }
+            
+            Debug.Log($"👁️ Visibilité optimisée: {visibleCount} points visibles (échantillon {sampleRate})");
+        }
+        
+        bool IsPointInFrustum(Vector3 point, Plane[] frustumPlanes) {
+            // Vérifier si le point est dans le frustum
+            for (int i = 0; i < frustumPlanes.Length; i++) {
+                if (frustumPlanes[i].GetDistanceToPoint(point) < 0) {
+                    return false; // Point en dehors du frustum
+                }
+            }
+            return true; // Point dans le frustum
+        }
+        
+        bool EstimateVisibilityFromNeighbors(Point point, Vector3 cameraPosition, Vector3 cameraForward, float threshold) {
+            // Trouver le point le plus proche avec visibilité connue
+            Point nearestPoint = null;
+            float nearestDistance = float.MaxValue;
+            
+            foreach (var kvp in pointVisibility) {
+                float distance = Vector3.Distance(point.ToVector3(), kvp.Key.ToVector3());
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearestPoint = kvp.Key;
+                }
+            }
+            
+            if (nearestPoint != null) {
+                return pointVisibility[nearestPoint];
+            }
+            
+            // Fallback: calculer directement
+            Vector3 pointPosition = point.ToVector3();
+            Vector3 cameraToPoint = (pointPosition - cameraPosition).normalized;
+            float dotProduct = Vector3.Dot(cameraForward, cameraToPoint);
+            return dotProduct > threshold;
+        }
+        
+        void GenerateVisibilityLODMesh() {
+            if (useChunking) {
+                GenerateVisibilityLODMeshWithChunking();
+            } else {
+                GenerateVisibilityLODMeshSingle();
+            }
+        }
+        
+        void GenerateVisibilityLODMeshSingle() {
+            // Version qui fonctionne avec sélection de triangles
+            Debug.Log("👁️ Génération du mesh LOD de visibilité...");
+            
+            // Nettoyer d'abord
+            CleanupOldChunks();
+            
+            // Créer le mesh avec sélection de triangles basée sur la visibilité
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            List<Vector2> uvs = new List<Vector2>();
+            
+            // Créer un dictionnaire pour mapper les points vers les indices de vertices
+            Dictionary<Point, int> pointToIndex = new Dictionary<Point, int>();
+            int vertexIndex = 0;
+            
+            // Ajouter tous les points comme vertices
+            foreach (var point in points.Values) {
+                vertices.Add(point.ToVector3() * radius);
+                
+                // Calculer les UVs sphériques
+                if (useSphericalUVs) {
+                    Vector3 pos = point.ToVector3();
+                    float u = 0.5f + Mathf.Atan2(pos.z, pos.x) / (2f * Mathf.PI);
+                    float v = 0.5f - Mathf.Asin(pos.y) / Mathf.PI;
+                    uvs.Add(new Vector2(u, v));
+                } else {
+                    uvs.Add(new Vector2(0.5f, 0.5f));
+                }
+                
+                pointToIndex[point] = vertexIndex++;
+            }
+            
+            // Compter les triangles visibles et cachés
+            int visibleTriangles = 0;
+            int hiddenTriangles = 0;
+            
+            // Créer les triangles avec sélection basée sur la visibilité
+            foreach (var triangle in this.triangles) {
+                if (pointToIndex.ContainsKey(triangle.points[0]) &&
+                    pointToIndex.ContainsKey(triangle.points[1]) &&
+                    pointToIndex.ContainsKey(triangle.points[2])) {
+                    
+                    // Déterminer si le triangle est visible
+                    bool isVisible = triangleVisibility.ContainsKey(triangle) && triangleVisibility[triangle];
+                    
+                    if (isVisible) {
+                        visibleTriangles++;
+                        // Triangle visible - garder le détail
+                        if (fixTriangleOrientation) {
+                            // Vérifier l'orientation du triangle
+                            Vector3 v0 = vertices[pointToIndex[triangle.points[0]]];
+                            Vector3 v1 = vertices[pointToIndex[triangle.points[1]]];
+                            Vector3 v2 = vertices[pointToIndex[triangle.points[2]]];
+                            
+                            Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
+                            Vector3 center = (v0 + v1 + v2) / 3f;
+                            
+                            if (Vector3.Dot(normal, center) < 0) {
+                                triangles.Add(pointToIndex[triangle.points[0]]);
+                                triangles.Add(pointToIndex[triangle.points[2]]);
+                                triangles.Add(pointToIndex[triangle.points[1]]);
+                            } else {
+                                triangles.Add(pointToIndex[triangle.points[0]]);
+                                triangles.Add(pointToIndex[triangle.points[1]]);
+                                triangles.Add(pointToIndex[triangle.points[2]]);
+                            }
+                        } else {
+                            triangles.Add(pointToIndex[triangle.points[0]]);
+                            triangles.Add(pointToIndex[triangle.points[1]]);
+                            triangles.Add(pointToIndex[triangle.points[2]]);
+                        }
+                    } else {
+                        hiddenTriangles++;
+                        // Triangle caché - omettre ou simplifier selon backLODDivisions
+                        if (backLODDivisions > 0) {
+                            // Garder le triangle mais avec moins de détail
+                            triangles.Add(pointToIndex[triangle.points[0]]);
+                            triangles.Add(pointToIndex[triangle.points[1]]);
+                            triangles.Add(pointToIndex[triangle.points[2]]);
+                        }
+                        // Sinon, omettre le triangle (pas d'ajout)
+                    }
+                }
+            }
+            
+            // Créer le mesh
+            hexagonMesh = new Mesh();
+            hexagonMesh.name = "Hexasphere Visibility LOD Mesh";
+            hexagonMesh.vertices = vertices.ToArray();
+            hexagonMesh.triangles = triangles.ToArray();
+            hexagonMesh.uv = uvs.ToArray();
+            hexagonMesh.RecalculateNormals();
+            hexagonMesh.RecalculateBounds();
+            
+            // Assigner le mesh
+            meshFilter.mesh = hexagonMesh;
+            
+            // Configurer le matériau
+            if (hexagonMaterial == null) {
+                hexagonMaterial = new Material(Shader.Find("Standard"));
+                hexagonMaterial.color = hexagonColor;
+            }
+            meshRenderer.material = hexagonMaterial;
+            
+            Debug.Log($"👁️ LOD Visibilité: {visibleTriangles} triangles visibles, {hiddenTriangles} triangles cachés, {triangles.Count/3} triangles totaux");
+        }
+        
+        void GenerateVisibilityLODMeshWithChunking() {
+            // Implémentation similaire mais avec chunking
+            // Pour l'instant, utiliser la version simple
+            GenerateVisibilityLODMeshSingle();
         }
         
         // Méthode pour obtenir un point caché (comme Hexasphere)
@@ -667,6 +1087,45 @@ namespace HexasphereTest {
                 GenerateHexasphere();
             }
             
+            GUILayout.Space(5);
+            
+            if (GUILayout.Button("👁️ Toggle Visibility LOD")) {
+                useVisibilityLOD = !useVisibilityLOD;
+                GenerateHexasphere();
+            }
+            
+            if (GUILayout.Button("👁️ Toggle Frustum Culling")) {
+                useFrustumCulling = !useFrustumCulling;
+                GenerateHexasphere();
+            }
+            
+            if (GUILayout.Button("🔺 Toggle Frustum Cone")) {
+                useFrustumCone = !useFrustumCone;
+                GenerateHexasphere();
+            }
+            
+            if (GUILayout.Button("🔺 Toggle Frustum Debug")) {
+                showFrustumDebug = !showFrustumDebug;
+            }
+            
+            if (GUILayout.Button("👁️ Force Visibility Update")) {
+                if (useVisibilityLOD && lodCamera != null) {
+                    CalculateVisibilityOptimized();
+                    GenerateVisibilityLODMesh();
+                }
+            }
+            
+            if (GUILayout.Button("🗺️ Toggle Sector LOD")) {
+                useSectorLOD = !useSectorLOD;
+                if (useSectorLOD) {
+                    InitializeSectors();
+                }
+            }
+            
+            if (GUILayout.Button("🗺️ Toggle Sector Debug")) {
+                showSectorDebug = !showSectorDebug;
+            }
+            
             GUILayout.Label($"Chunking: {(useChunking ? "ON" : "OFF")}");
             GUILayout.Label($"LOD: {(useLOD ? "ON" : "OFF")}");
             GUILayout.Label($"Chunks: {chunkCount}");
@@ -679,8 +1138,342 @@ namespace HexasphereTest {
                 GUILayout.Label($"Current LOD: {currentLODDivisions}");
             }
             
+            if (useVisibilityLOD && lodCamera != null) {
+                GUILayout.Label($"Visibility LOD: {(useVisibilityLOD ? "ON" : "OFF")}");
+                GUILayout.Label($"Visibility Angle: {visibilityAngle:F0}°");
+                GUILayout.Label($"Front LOD: {frontLODDivisions}");
+                GUILayout.Label($"Back LOD: {backLODDivisions}");
+                GUILayout.Label($"Frustum Culling: {(useFrustumCulling ? "ON" : "OFF")}");
+                GUILayout.Label($"Frustum Cone: {(useFrustumCone ? "ON" : "OFF")}");
+                GUILayout.Label($"Frustum Debug: {(showFrustumDebug ? "ON" : "OFF")}");
+                
+                if (pointVisibility.Count > 0) {
+                    int visiblePoints = 0;
+                    foreach (var isVisible in pointVisibility.Values) {
+                        if (isVisible) visiblePoints++;
+                    }
+                    GUILayout.Label($"Visible Points: {visiblePoints}/{pointVisibility.Count}");
+                }
+            }
+            
+            if (useSectorLOD && lodCamera != null) {
+                GUILayout.Label($"Sector LOD: {(useSectorLOD ? "ON" : "OFF")}");
+                GUILayout.Label($"Sectors: {sectorCount}");
+                GUILayout.Label($"High LOD: {highLODSectors}");
+                GUILayout.Label($"Medium LOD: {mediumLODSectors}");
+                GUILayout.Label($"Low LOD: {lowLODSectors}");
+                GUILayout.Label($"Sector Debug: {(showSectorDebug ? "ON" : "OFF")}");
+                
+                if (sectorVisibility.Count > 0) {
+                    int visibleSectors = 0;
+                    foreach (var isVisible in sectorVisibility.Values) {
+                        if (isVisible) visibleSectors++;
+                    }
+                    GUILayout.Label($"Visible Sectors: {visibleSectors}/{sectorCount}");
+                }
+            }
+            
             GUILayout.EndVertical();
             GUILayout.EndArea();
+        }
+        
+        void OnDrawGizmos() {
+            if (showFrustumDebug && lodCamera != null) {
+                DrawFrustumDebug();
+            }
+            
+            if (showSectorDebug && useSectorLOD) {
+                DrawSectorDebug();
+            }
+        }
+        
+        void DrawFrustumDebug() {
+            if (lodCamera == null) return;
+            
+            // Dessiner le frustum de la caméra
+            Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(lodCamera);
+            
+            // Dessiner quelques points de test
+            int sampleCount = Mathf.Min(100, points.Count);
+            int sampleRate = Mathf.Max(1, points.Count / sampleCount);
+            int pointIndex = 0;
+            
+            foreach (var point in points.Values) {
+                if (pointIndex % sampleRate == 0) {
+                    // Position corrigée : utiliser la position transformée de la sphère
+                    Vector3 pointPosition = transform.TransformPoint(point.ToVector3() * radius);
+                    bool isVisible = IsPointInFrustum(pointPosition, frustumPlanes);
+                    
+                    Gizmos.color = isVisible ? Color.green : Color.red;
+                    Gizmos.DrawWireSphere(pointPosition, 0.1f);
+                }
+                pointIndex++;
+            }
+            
+            // Dessiner les plans du frustum
+            Gizmos.color = Color.yellow;
+            for (int i = 0; i < frustumPlanes.Length; i++) {
+                Vector3 planeCenter = frustumPlanes[i].normal * frustumPlanes[i].distance;
+                Gizmos.DrawWireSphere(planeCenter, 0.2f);
+            }
+        }
+        
+        void InitializeSectors() {
+            // Initialiser les 12 secteurs dodécaédriques
+            // Les centres des 12 secteurs sont basés sur un dodécaèdre régulier
+            float phi = (1f + Mathf.Sqrt(5f)) / 2f; // Nombre d'or
+            float a = 1f / Mathf.Sqrt(3f);
+            float b = a / phi;
+            float c = a * phi;
+            
+            // 12 centres du dodécaèdre
+            sectorCenters[0] = new Vector3(a, a, a).normalized;
+            sectorCenters[1] = new Vector3(a, a, -a).normalized;
+            sectorCenters[2] = new Vector3(a, -a, a).normalized;
+            sectorCenters[3] = new Vector3(a, -a, -a).normalized;
+            sectorCenters[4] = new Vector3(-a, a, a).normalized;
+            sectorCenters[5] = new Vector3(-a, a, -a).normalized;
+            sectorCenters[6] = new Vector3(-a, -a, a).normalized;
+            sectorCenters[7] = new Vector3(-a, -a, -a).normalized;
+            sectorCenters[8] = new Vector3(0, b, c).normalized;
+            sectorCenters[9] = new Vector3(0, b, -c).normalized;
+            sectorCenters[10] = new Vector3(0, -b, c).normalized;
+            sectorCenters[11] = new Vector3(0, -b, -c).normalized;
+            
+            Debug.Log("🗺️ Secteurs dodécaédriques initialisés");
+        }
+        
+        void UpdateSectorLOD() {
+            if (lodCamera == null) return;
+            
+            // Mise à jour basée sur l'intervalle de frames pour la performance
+            frameCounter++;
+            if (frameCounter < visibilityUpdateInterval) {
+                return;
+            }
+            frameCounter = 0;
+            
+            // Vérifier si la caméra a bougé significativement
+            Vector3 currentCameraPosition = lodCamera.transform.position;
+            Quaternion currentCameraRotation = lodCamera.transform.rotation;
+            
+            bool cameraMoved = Vector3.Distance(currentCameraPosition, lastCameraPosition) > 1f ||
+                              Quaternion.Angle(currentCameraRotation, lastCameraRotation) > 15f;
+            
+            if (cameraMoved) {
+                lastCameraPosition = currentCameraPosition;
+                lastCameraRotation = currentCameraRotation;
+                
+                // Calculer la visibilité des secteurs
+                CalculateSectorVisibility();
+                
+                // Régénérer le mesh avec LOD par secteurs
+                GenerateSectorLODMesh();
+                
+                Debug.Log($"🗺️ LOD Secteurs mis à jour: Caméra bougée");
+            }
+        }
+        
+        void CalculateSectorVisibility() {
+            if (lodCamera == null) return;
+            
+            Vector3 cameraPosition = lodCamera.transform.position;
+            Vector3 cameraForward = lodCamera.transform.forward;
+            
+            // Calculer la visibilité de chaque secteur
+            for (int i = 0; i < sectorCount; i++) {
+                Vector3 sectorCenter = sectorCenters[i];
+                Vector3 cameraToSector = (sectorCenter - cameraPosition).normalized;
+                
+                // Calculer l'angle entre la direction de la caméra et le secteur
+                float dotProduct = Vector3.Dot(cameraForward, cameraToSector);
+                bool isVisible = dotProduct > 0.3f; // Seuil de visibilité
+                
+                sectorVisibility[i] = isVisible;
+                
+                // Déterminer le niveau de LOD basé sur la distance et l'angle
+                float distance = Vector3.Distance(cameraPosition, sectorCenter * radius);
+                float angle = Mathf.Acos(dotProduct) * Mathf.Rad2Deg;
+                
+                if (isVisible && angle < 30f) {
+                    sectorLODLevel[i] = 3; // LOD élevé
+                } else if (isVisible && angle < 60f) {
+                    sectorLODLevel[i] = 2; // LOD moyen
+                } else if (isVisible) {
+                    sectorLODLevel[i] = 1; // LOD bas
+                } else {
+                    sectorLODLevel[i] = 0; // Caché
+                }
+            }
+            
+            Debug.Log($"🗺️ Visibilité des secteurs calculée");
+        }
+        
+        void GenerateSectorLODMesh() {
+            // Générer le mesh avec LOD par secteurs
+            Debug.Log("🗺️ Génération du mesh LOD par secteurs...");
+            
+            // Nettoyer d'abord
+            CleanupOldChunks();
+            
+            // Créer le mesh avec sélection basée sur les secteurs
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            List<Vector2> uvs = new List<Vector2>();
+            
+            // Créer un dictionnaire pour mapper les points vers les indices de vertices
+            Dictionary<Point, int> pointToIndex = new Dictionary<Point, int>();
+            int vertexIndex = 0;
+            
+            // Ajouter tous les points comme vertices
+            foreach (var point in points.Values) {
+                vertices.Add(point.ToVector3() * radius);
+                
+                // Calculer les UVs sphériques
+                if (useSphericalUVs) {
+                    Vector3 pos = point.ToVector3();
+                    float u = 0.5f + Mathf.Atan2(pos.z, pos.x) / (2f * Mathf.PI);
+                    float v = 0.5f - Mathf.Asin(pos.y) / Mathf.PI;
+                    uvs.Add(new Vector2(u, v));
+                } else {
+                    uvs.Add(new Vector2(0.5f, 0.5f));
+                }
+                
+                pointToIndex[point] = vertexIndex++;
+            }
+            
+            // Compter les triangles par secteur
+            int[] sectorTriangleCounts = new int[sectorCount];
+            
+            // Créer les triangles avec LOD par secteurs
+            foreach (var triangle in this.triangles) {
+                if (pointToIndex.ContainsKey(triangle.points[0]) &&
+                    pointToIndex.ContainsKey(triangle.points[1]) &&
+                    pointToIndex.ContainsKey(triangle.points[2])) {
+                    
+                    // Déterminer le secteur du triangle
+                    int triangleSector = GetTriangleSector(triangle);
+                    
+                    if (triangleSector >= 0 && triangleSector < sectorCount) {
+                        sectorTriangleCounts[triangleSector]++;
+                        
+                        // Vérifier si le secteur est visible et son niveau de LOD
+                        bool sectorVisible = sectorVisibility.ContainsKey(triangleSector) && sectorVisibility[triangleSector];
+                        int sectorLOD = sectorLODLevel.ContainsKey(triangleSector) ? sectorLODLevel[triangleSector] : 0;
+                        
+                        if (sectorVisible && sectorLOD > 0) {
+                            // Ajouter le triangle selon le niveau de LOD
+                            if (sectorLOD >= 2 || (sectorLOD == 1 && UnityEngine.Random.Range(0f, 1f) > 0.5f)) {
+                                // Triangle visible - garder le détail
+                                if (fixTriangleOrientation) {
+                                    // Vérifier l'orientation du triangle
+                                    Vector3 v0 = vertices[pointToIndex[triangle.points[0]]];
+                                    Vector3 v1 = vertices[pointToIndex[triangle.points[1]]];
+                                    Vector3 v2 = vertices[pointToIndex[triangle.points[2]]];
+                                    
+                                    Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
+                                    Vector3 center = (v0 + v1 + v2) / 3f;
+                                    
+                                    if (Vector3.Dot(normal, center) < 0) {
+                                        triangles.Add(pointToIndex[triangle.points[0]]);
+                                        triangles.Add(pointToIndex[triangle.points[2]]);
+                                        triangles.Add(pointToIndex[triangle.points[1]]);
+                                    } else {
+                                        triangles.Add(pointToIndex[triangle.points[0]]);
+                                        triangles.Add(pointToIndex[triangle.points[1]]);
+                                        triangles.Add(pointToIndex[triangle.points[2]]);
+                                    }
+                                } else {
+                                    triangles.Add(pointToIndex[triangle.points[0]]);
+                                    triangles.Add(pointToIndex[triangle.points[1]]);
+                                    triangles.Add(pointToIndex[triangle.points[2]]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Créer le mesh
+            hexagonMesh = new Mesh();
+            hexagonMesh.name = "Hexasphere Sector LOD Mesh";
+            hexagonMesh.vertices = vertices.ToArray();
+            hexagonMesh.triangles = triangles.ToArray();
+            hexagonMesh.uv = uvs.ToArray();
+            hexagonMesh.RecalculateNormals();
+            hexagonMesh.RecalculateBounds();
+            
+            // Assigner le mesh
+            meshFilter.mesh = hexagonMesh;
+            
+            // Configurer le matériau
+            if (hexagonMaterial == null) {
+                hexagonMaterial = new Material(Shader.Find("Standard"));
+                hexagonMaterial.color = hexagonColor;
+            }
+            meshRenderer.material = hexagonMaterial;
+            
+            Debug.Log($"🗺️ LOD Secteurs: {triangles.Count/3} triangles générés");
+        }
+        
+        int GetTriangleSector(Triangle triangle) {
+            // Calculer le centre du triangle
+            Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+            center = center.normalized;
+            
+            // Trouver le secteur le plus proche
+            int closestSector = 0;
+            float closestDistance = float.MaxValue;
+            
+            for (int i = 0; i < sectorCount; i++) {
+                float distance = Vector3.Distance(center, sectorCenters[i]);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestSector = i;
+                }
+            }
+            
+            return closestSector;
+        }
+        
+        void DrawSectorDebug() {
+            if (lodCamera == null) return;
+            
+            // Dessiner les centres des secteurs
+            for (int i = 0; i < sectorCount; i++) {
+                Vector3 sectorCenter = transform.TransformPoint(sectorCenters[i] * radius);
+                
+                // Couleur basée sur la visibilité et le LOD
+                if (sectorVisibility.ContainsKey(i) && sectorVisibility[i]) {
+                    if (sectorLODLevel.ContainsKey(i)) {
+                        switch (sectorLODLevel[i]) {
+                            case 3: Gizmos.color = Color.green; break; // LOD élevé
+                            case 2: Gizmos.color = Color.yellow; break; // LOD moyen
+                            case 1: Gizmos.color = new Color(1f, 0.5f, 0f); break; // LOD bas (orange)
+                            default: Gizmos.color = Color.blue; break; // Visible mais LOD 0
+                        }
+                    } else {
+                        Gizmos.color = Color.blue;
+                    }
+                } else {
+                    Gizmos.color = Color.red; // Caché
+                }
+                
+                // Dessiner le centre du secteur
+                Gizmos.DrawWireSphere(sectorCenter, 0.2f);
+                
+                // Dessiner une ligne vers le centre de la sphère
+                Gizmos.color = Color.white;
+                Gizmos.DrawLine(sectorCenter, transform.position);
+            }
+            
+            // Dessiner la direction de la caméra
+            if (lodCamera != null) {
+                Gizmos.color = Color.cyan;
+                Vector3 cameraPos = lodCamera.transform.position;
+                Vector3 cameraForward = lodCamera.transform.forward * 2f;
+                Gizmos.DrawRay(cameraPos, cameraForward);
+            }
         }
     }
     
