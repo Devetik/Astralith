@@ -3,6 +3,18 @@ using System.Collections.Generic;
 using System;
 
 public class HexasphereFill : MonoBehaviour {
+
+    [Header("🎯 Subdivision par Zones")]
+    [SerializeField] public bool useSelectiveSubdivision = false;
+    [SerializeField] public Vector3 focusPoint = Vector3.forward; // Point de focus pour la subdivision
+    [SerializeField] public float focusRadius = 0.5f; // Rayon de la zone de focus
+    [SerializeField] public int focusDivisions = 5; // Divisions dans la zone de focus
+    [SerializeField] public int backgroundDivisions = 1; // Divisions en arrière-plan
+    [SerializeField] public bool showFocusDebug = false; // Afficher la zone de focus
+    [SerializeField] public bool showFocusPoint = true; // Afficher le point de focus
+    [SerializeField] public Color focusPointColor = Color.red; // Couleur du point de focus
+    [SerializeField] public float focusPointSize = 0.1f; // Taille du point de focus
+
     [Header("🔷 Hexasphere Settings")]
     [SerializeField] public int divisions = 3;
     [SerializeField] public float radius = 1f;
@@ -54,16 +66,17 @@ public class HexasphereFill : MonoBehaviour {
     [SerializeField] public int maxVerticesPerChunk = 65000;
     [SerializeField] public int maxChunks = 100;
     
-    [Header("🎯 Subdivision par Zones")]
-    [SerializeField] public bool useSelectiveSubdivision = false;
-    [SerializeField] public Vector3 focusPoint = Vector3.forward; // Point de focus pour la subdivision
-    [SerializeField] public float focusRadius = 0.5f; // Rayon de la zone de focus
-    [SerializeField] public int focusDivisions = 5; // Divisions dans la zone de focus
-    [SerializeField] public int backgroundDivisions = 1; // Divisions en arrière-plan
-    [SerializeField] public bool showFocusDebug = false; // Afficher la zone de focus
-    [SerializeField] public bool showFocusPoint = true; // Afficher le point de focus
-    [SerializeField] public Color focusPointColor = Color.red; // Couleur du point de focus
-    [SerializeField] public float focusPointSize = 0.1f; // Taille du point de focus
+    [Header("🔷 Système de Chunks par Face")]
+    [SerializeField] public bool useIcosahedronChunking = true; // Chunking basé sur les 20 faces de l'icosaèdre
+    [SerializeField] public bool showChunkDebug = false; // Debug des chunks
+    [SerializeField] public Color[] chunkColors = new Color[20]; // Couleurs pour chaque chunk
+    
+    [Header("🛡️ Protection des Chunks")]
+    [SerializeField] public bool useChunkProtection = true; // Protection contre l'explosion des meshes
+    [SerializeField] public int maxVerticesPerFaceChunk = 4000; // Limite de vertices par chunk de face (ultra conservateur)
+    [SerializeField] public int maxTrianglesPerFaceChunk = 6000; // Limite de triangles par chunk de face (ultra conservateur)
+    [SerializeField] public bool autoSplitLargeChunks = true; // Diviser automatiquement les chunks trop gros
+    [SerializeField] public int maxSubChunksPerFace = 64; // Nombre max de sous-chunks par face (ultra augmenté)
     
     [Header("🔄 Subdivision Dynamique")]
     [SerializeField] public bool useDynamicSubdivision = true; // Subdivision dynamique
@@ -105,6 +118,27 @@ public class HexasphereFill : MonoBehaviour {
     private MeshFilter[] meshFilterChunks;
     private MeshRenderer[] meshRendererChunks;
     private int chunkCount = 0;
+    
+    // Variables pour le chunking par face d'icosaèdre
+    private List<Vector3>[] faceVerticesChunks;
+    private List<int>[] faceTrianglesChunks;
+    private List<Vector2>[] faceUvsChunks;
+    private Mesh[] faceMeshChunks;
+    private MeshFilter[] faceMeshFilterChunks;
+    private MeshRenderer[] faceMeshRendererChunks;
+    private GameObject[] faceChunkObjects;
+    private int[] faceChunkTriangleCounts;
+    private bool[] faceChunkActive;
+    
+    // Variables pour les sous-chunks (protection contre l'explosion)
+    private List<List<Vector3>>[] faceSubVerticesChunks;
+    private List<List<int>>[] faceSubTrianglesChunks;
+    private List<List<Vector2>>[] faceSubUvsChunks;
+    private List<Mesh>[] faceSubMeshChunks;
+    private List<MeshFilter>[] faceSubMeshFilterChunks;
+    private List<MeshRenderer>[] faceSubMeshRendererChunks;
+    private List<GameObject>[] faceSubChunkObjects;
+    private int[] faceSubChunkCounts;
     
     // Variables pour le point de focus
     private GameObject focusPointObject;
@@ -206,7 +240,9 @@ public class HexasphereFill : MonoBehaviour {
         ApplySubdivisions();
         
         // Générer le mesh
-        if (useChunking) {
+        if (useIcosahedronChunking) {
+            GenerateMeshWithIcosahedronChunking();
+        } else if (useChunking) {
             GenerateMeshWithChunking();
         } else {
             GenerateMeshSingle();
@@ -727,6 +763,50 @@ public class HexasphereFill : MonoBehaviour {
         }
     }
     
+    void GenerateMeshWithIcosahedronChunking() {
+        // Initialiser les chunks par face
+        InitializeIcosahedronChunks();
+        
+        // Créer un dictionnaire pour mapper les points vers les indices de vertices
+        Dictionary<Point, int> pointToIndex = new Dictionary<Point, int>();
+        int vertexIndex = 0;
+        
+        // Ajouter tous les points comme vertices dans le premier chunk
+        foreach (var point in points.Values) {
+            faceVerticesChunks[0].Add(point.ToVector3() * radius);
+            
+            if (useSphericalUVs) {
+                Vector3 pos = point.ToVector3();
+                float u = 0.5f + Mathf.Atan2(pos.z, pos.x) / (2f * Mathf.PI);
+                float v = 0.5f - Mathf.Asin(pos.y) / Mathf.PI;
+                faceUvsChunks[0].Add(new Vector2(u, v));
+            } else {
+                faceUvsChunks[0].Add(new Vector2(0.5f, 0.5f));
+            }
+            
+            pointToIndex[point] = vertexIndex++;
+        }
+        
+        // Distribuer les triangles selon leur face d'origine
+        DistributeTrianglesToFaceChunks(pointToIndex);
+        
+        // Créer les meshes des chunks par face
+        CreateFaceChunkMeshes();
+        
+        // Appliquer la génération procédurale à tous les chunks (normaux et sous-chunks)
+        if (useProceduralGeneration) {
+            ApplyProceduralGenerationToAllChunks();
+        }
+        
+        // Désactiver le mesh principal quand on utilise le système de chunks
+        if (meshFilter != null) {
+            meshFilter.mesh = null;
+        }
+        if (meshRenderer != null) {
+            meshRenderer.enabled = false;
+        }
+    }
+    
     void GenerateMeshWithChunking() {
         // Initialiser les chunks
         InitializeChunks();
@@ -792,6 +872,54 @@ public class HexasphereFill : MonoBehaviour {
         CreateChunkMeshes();
     }
     
+    void InitializeIcosahedronChunks() {
+        // Initialiser les 20 chunks (une par face de l'icosaèdre)
+        int faceCount = 20;
+        
+        faceVerticesChunks = new List<Vector3>[faceCount];
+        faceTrianglesChunks = new List<int>[faceCount];
+        faceUvsChunks = new List<Vector2>[faceCount];
+        faceMeshChunks = new Mesh[faceCount];
+        faceMeshFilterChunks = new MeshFilter[faceCount];
+        faceMeshRendererChunks = new MeshRenderer[faceCount];
+        faceChunkObjects = new GameObject[faceCount];
+        faceChunkTriangleCounts = new int[faceCount];
+        faceChunkActive = new bool[faceCount];
+        
+        // Initialiser les sous-chunks pour la protection
+        faceSubVerticesChunks = new List<List<Vector3>>[faceCount];
+        faceSubTrianglesChunks = new List<List<int>>[faceCount];
+        faceSubUvsChunks = new List<List<Vector2>>[faceCount];
+        faceSubMeshChunks = new List<Mesh>[faceCount];
+        faceSubMeshFilterChunks = new List<MeshFilter>[faceCount];
+        faceSubMeshRendererChunks = new List<MeshRenderer>[faceCount];
+        faceSubChunkObjects = new List<GameObject>[faceCount];
+        faceSubChunkCounts = new int[faceCount];
+        
+        for (int i = 0; i < faceCount; i++) {
+            faceVerticesChunks[i] = new List<Vector3>();
+            faceTrianglesChunks[i] = new List<int>();
+            faceUvsChunks[i] = new List<Vector2>();
+            faceChunkTriangleCounts[i] = 0;
+            faceChunkActive[i] = true;
+            
+            // Initialiser les sous-chunks
+            faceSubVerticesChunks[i] = new List<List<Vector3>>();
+            faceSubTrianglesChunks[i] = new List<List<int>>();
+            faceSubUvsChunks[i] = new List<List<Vector2>>();
+            faceSubMeshChunks[i] = new List<Mesh>();
+            faceSubMeshFilterChunks[i] = new List<MeshFilter>();
+            faceSubMeshRendererChunks[i] = new List<MeshRenderer>();
+            faceSubChunkObjects[i] = new List<GameObject>();
+            faceSubChunkCounts[i] = 0;
+            
+            // Initialiser les couleurs des chunks si pas déjà fait
+            if (chunkColors[i] == Color.clear) {
+                chunkColors[i] = Color.HSVToRGB(i / 20f, 0.8f, 0.8f);
+            }
+        }
+    }
+    
     void InitializeChunks() {
         verticesChunks = new List<Vector3>[maxChunks];
         trianglesChunks = new List<int>[maxChunks];
@@ -807,6 +935,359 @@ public class HexasphereFill : MonoBehaviour {
         }
         
         chunkCount = 0;
+    }
+    
+    void DistributeTrianglesToFaceChunks(Dictionary<Point, int> pointToIndex) {
+        // Créer une liste des faces originales de l'icosaèdre
+        List<Triangle> originalFaces = GetOriginalIcosahedronFaces();
+        
+        // Pour chaque triangle, déterminer à quelle face d'origine il appartient
+        foreach (var triangle in this.triangles) {
+            int faceIndex = FindOriginalFaceForTriangle(triangle, originalFaces);
+            
+            if (faceIndex >= 0 && faceIndex < 20) {
+                // Ajouter le triangle au chunk correspondant
+                if (pointToIndex.ContainsKey(triangle.points[0]) &&
+                    pointToIndex.ContainsKey(triangle.points[1]) &&
+                    pointToIndex.ContainsKey(triangle.points[2])) {
+                    
+                    if (fixTriangleOrientation) {
+                        // Vérifier l'orientation du triangle
+                        Vector3 v0 = faceVerticesChunks[0][pointToIndex[triangle.points[0]]];
+                        Vector3 v1 = faceVerticesChunks[0][pointToIndex[triangle.points[1]]];
+                        Vector3 v2 = faceVerticesChunks[0][pointToIndex[triangle.points[2]]];
+                        
+                        Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
+                        Vector3 center = (v0 + v1 + v2) / 3f;
+                        
+                        if (Vector3.Dot(normal, center) < 0) {
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[0]]);
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[2]]);
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[1]]);
+                        } else {
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[0]]);
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[1]]);
+                            faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[2]]);
+                        }
+                    } else {
+                        faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[0]]);
+                        faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[1]]);
+                        faceTrianglesChunks[faceIndex].Add(pointToIndex[triangle.points[2]]);
+                    }
+                    
+                    faceChunkTriangleCounts[faceIndex]++;
+                }
+            }
+        }
+        
+        // Vérifier et diviser les chunks trop gros si nécessaire
+        if (useChunkProtection && autoSplitLargeChunks) {
+            SplitOversizedFaceChunks();
+        } else {
+            Debug.LogWarning("⚠️ Protection des chunks désactivée! useChunkProtection=" + useChunkProtection + ", autoSplitLargeChunks=" + autoSplitLargeChunks);
+        }
+    }
+    
+    List<Triangle> GetOriginalIcosahedronFaces() {
+        List<Triangle> originalFaces = new List<Triangle>();
+        
+        // Créer les 20 faces originales de l'icosaèdre
+        float t = (1f + Mathf.Sqrt(5f)) / 2f;
+        
+        Point[] vertices = new Point[12];
+        vertices[0] = new Point(-1, t, 0).Normalized;
+        vertices[1] = new Point(1, t, 0).Normalized;
+        vertices[2] = new Point(-1, -t, 0).Normalized;
+        vertices[3] = new Point(1, -t, 0).Normalized;
+        vertices[4] = new Point(0, -1, t).Normalized;
+        vertices[5] = new Point(0, 1, t).Normalized;
+        vertices[6] = new Point(0, -1, -t).Normalized;
+        vertices[7] = new Point(0, 1, -t).Normalized;
+        vertices[8] = new Point(t, 0, -1).Normalized;
+        vertices[9] = new Point(t, 0, 1).Normalized;
+        vertices[10] = new Point(-t, 0, -1).Normalized;
+        vertices[11] = new Point(-t, 0, 1).Normalized;
+        
+        int[] indices = {
+            0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11,
+            1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
+            3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9,
+            4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1
+        };
+        
+        for (int i = 0; i < indices.Length; i += 3) {
+            originalFaces.Add(new Triangle(
+                vertices[indices[i]],
+                vertices[indices[i + 1]],
+                vertices[indices[i + 2]]
+            ));
+        }
+        
+        return originalFaces;
+    }
+    
+    int FindOriginalFaceForTriangle(Triangle triangle, List<Triangle> originalFaces) {
+        // Calculer le centre du triangle
+        Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+        center = center.normalized;
+        
+        // Trouver la face originale la plus proche
+        float minDistance = float.MaxValue;
+        int closestFaceIndex = 0;
+        
+        for (int i = 0; i < originalFaces.Count; i++) {
+            Vector3 faceCenter = (originalFaces[i].points[0].ToVector3() + 
+                                 originalFaces[i].points[1].ToVector3() + 
+                                 originalFaces[i].points[2].ToVector3()) / 3f;
+            faceCenter = faceCenter.normalized;
+            
+            float distance = Vector3.Distance(center, faceCenter);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestFaceIndex = i;
+            }
+        }
+        
+        return closestFaceIndex;
+    }
+    
+    void SplitOversizedFaceChunks() {
+        
+        for (int faceIndex = 0; faceIndex < 20; faceIndex++) {
+            int triangleCount = faceTrianglesChunks[faceIndex].Count;
+            int vertexCount = faceVerticesChunks[0].Count; // Tous les vertices sont partagés
+            
+            
+            // Vérifier si le chunk dépasse les limites (triangles OU vertices)
+            bool exceedsLimits = triangleCount > maxTrianglesPerFaceChunk || vertexCount > maxVerticesPerFaceChunk;
+            
+            if (exceedsLimits) {
+                Debug.Log($"⚠️ Chunk {faceIndex} dépasse la limite! Triangles: {triangleCount}/{maxTrianglesPerFaceChunk}, Vertices: {vertexCount}/{maxVerticesPerFaceChunk}");
+                
+                if (faceSubChunkCounts[faceIndex] < maxSubChunksPerFace) {
+                    // Calculer le nombre de sous-chunks nécessaires basé sur la limite la plus restrictive
+                    int trianglesNeeded = (triangleCount / maxTrianglesPerFaceChunk) + 1;
+                    int verticesNeeded = (vertexCount / maxVerticesPerFaceChunk) + 1;
+                    int subChunkCount = Mathf.Min(maxSubChunksPerFace, Mathf.Max(trianglesNeeded, verticesNeeded));
+                    
+                    // Pour les très gros chunks, être ultra agressif
+                    if (triangleCount > 25000 || vertexCount > 12500) {
+                        subChunkCount = Mathf.Max(subChunkCount, 16); // Minimum 16 sous-chunks pour les gros chunks
+                    }
+                    if (triangleCount > 50000 || vertexCount > 25000) {
+                        subChunkCount = Mathf.Max(subChunkCount, 32); // Minimum 32 sous-chunks pour les très gros chunks
+                    }
+                    if (triangleCount > 100000 || vertexCount > 50000) {
+                        subChunkCount = Mathf.Max(subChunkCount, 48); // Minimum 48 sous-chunks pour les énormes chunks
+                    }
+                    
+                    
+                    // Créer les sous-chunks
+                    for (int subIndex = 0; subIndex < subChunkCount; subIndex++) {
+                        faceSubVerticesChunks[faceIndex].Add(new List<Vector3>());
+                        faceSubTrianglesChunks[faceIndex].Add(new List<int>());
+                        faceSubUvsChunks[faceIndex].Add(new List<Vector2>());
+                    }
+                    
+                    // Distribuer les triangles entre les sous-chunks de manière équitable
+                    int trianglesPerSubChunk = triangleCount / subChunkCount;
+                    int remainder = triangleCount % subChunkCount;
+                    
+                    int currentTriangle = 0;
+                    for (int subIndex = 0; subIndex < subChunkCount; subIndex++) {
+                        // Calculer le nombre de triangles pour ce sous-chunk
+                        int trianglesForThisSubChunk = trianglesPerSubChunk;
+                        if (subIndex < remainder) {
+                            trianglesForThisSubChunk++; // Distribuer le reste équitablement
+                        }
+                        
+                        Debug.Log($"🔧 Sous-chunk {faceIndex}.{subIndex} recevra {trianglesForThisSubChunk} triangles");
+                        
+                        // Ajouter les triangles à ce sous-chunk
+                        for (int t = 0; t < trianglesForThisSubChunk; t++) {
+                            if (currentTriangle < triangleCount) {
+                                faceSubTrianglesChunks[faceIndex][subIndex].Add(faceTrianglesChunks[faceIndex][currentTriangle]);
+                                faceSubTrianglesChunks[faceIndex][subIndex].Add(faceTrianglesChunks[faceIndex][currentTriangle + 1]);
+                                faceSubTrianglesChunks[faceIndex][subIndex].Add(faceTrianglesChunks[faceIndex][currentTriangle + 2]);
+                                currentTriangle += 3;
+                            }
+                        }
+                    }
+                    
+                    // Copier seulement les vertices utilisés par chaque sous-chunk
+                    for (int subIndex = 0; subIndex < subChunkCount; subIndex++) {
+                        // Créer un dictionnaire pour mapper les indices de vertices
+                        Dictionary<int, int> vertexIndexMap = new Dictionary<int, int>();
+                        int newVertexIndex = 0;
+                        
+                        // Parcourir les triangles de ce sous-chunk pour identifier les vertices utilisés
+                        for (int i = 0; i < faceSubTrianglesChunks[faceIndex][subIndex].Count; i++) {
+                            int originalIndex = faceSubTrianglesChunks[faceIndex][subIndex][i];
+                            
+                            if (!vertexIndexMap.ContainsKey(originalIndex)) {
+                                // Ajouter le vertex s'il n'est pas déjà dans la liste
+                                // Utiliser les vertices avec génération procédurale appliquée
+                                faceSubVerticesChunks[faceIndex][subIndex].Add(faceVerticesChunks[0][originalIndex]);
+                                faceSubUvsChunks[faceIndex][subIndex].Add(faceUvsChunks[0][originalIndex]);
+                                vertexIndexMap[originalIndex] = newVertexIndex++;
+                            }
+                            
+                            // Mettre à jour l'index du triangle
+                            faceSubTrianglesChunks[faceIndex][subIndex][i] = vertexIndexMap[originalIndex];
+                        }
+                        
+                    }
+                    
+                    // Vider le chunk principal
+                    faceTrianglesChunks[faceIndex].Clear();
+                    faceChunkTriangleCounts[faceIndex] = 0;
+                    faceSubChunkCounts[faceIndex] = subChunkCount;
+                    
+                    Debug.Log($"✅ Chunk {faceIndex} divisé en {subChunkCount} sous-chunks ({triangleCount} triangles)");
+                } else {
+                    Debug.LogError($"❌ Impossible de diviser le chunk {faceIndex} - limite de sous-chunks atteinte!");
+                }
+            }
+        }
+    }
+    
+    void CreateFaceChunkMeshes() {
+        for (int i = 0; i < 20; i++) {
+            // Vérifier s'il y a des sous-chunks pour cette face
+            if (faceSubChunkCounts[i] > 0) {
+                // Créer les sous-chunks
+                CreateSubChunkMeshes(i);
+            } else if (faceTrianglesChunks[i].Count > 0) {
+                // Créer le chunk principal normal
+                CreateSingleFaceChunkMesh(i);
+            }
+        }
+    }
+    
+    void CreateSingleFaceChunkMesh(int faceIndex) {
+        // Vérifier les limites avant de créer le mesh
+        int triangleCount = faceTrianglesChunks[faceIndex].Count;
+        int vertexCount = faceVerticesChunks[0].Count;
+        
+        if (triangleCount > maxTrianglesPerFaceChunk || vertexCount > maxVerticesPerFaceChunk) {
+            Debug.LogError($"❌ Chunk {faceIndex} dépasse encore les limites après division! Triangles: {triangleCount}/{maxTrianglesPerFaceChunk}, Vertices: {vertexCount}/{maxVerticesPerFaceChunk}");
+            Debug.LogError($"💡 Ce chunk devrait être divisé en sous-chunks. Vérifiez que useChunkProtection et autoSplitLargeChunks sont activés.");
+            return;
+        }
+        
+        
+        // Créer le GameObject du chunk par face
+        GameObject chunkObject = new GameObject($"Icosahedron Face Chunk {faceIndex}");
+        chunkObject.transform.SetParent(transform);
+        chunkObject.transform.localPosition = Vector3.zero;
+        chunkObject.transform.localRotation = Quaternion.identity;
+        chunkObject.transform.localScale = Vector3.one;
+        chunkObject.tag = "Planet";
+        
+        // Ajouter les composants
+        faceMeshFilterChunks[faceIndex] = chunkObject.AddComponent<MeshFilter>();
+        faceMeshRendererChunks[faceIndex] = chunkObject.AddComponent<MeshRenderer>();
+        faceChunkObjects[faceIndex] = chunkObject;
+        
+        // Créer le mesh
+        faceMeshChunks[faceIndex] = new Mesh();
+        faceMeshChunks[faceIndex].name = $"Icosahedron Face Chunk {faceIndex} Mesh";
+        faceMeshChunks[faceIndex].vertices = faceVerticesChunks[0].ToArray(); // Tous les vertices sont partagés
+        faceMeshChunks[faceIndex].triangles = faceTrianglesChunks[faceIndex].ToArray();
+        faceMeshChunks[faceIndex].uv = faceUvsChunks[0].ToArray(); // Tous les UVs sont partagés
+        faceMeshChunks[faceIndex].RecalculateNormals();
+        faceMeshChunks[faceIndex].RecalculateBounds();
+        
+        // Assigner le mesh
+        faceMeshFilterChunks[faceIndex].mesh = faceMeshChunks[faceIndex];
+        
+        // Appliquer la génération procédurale si activée
+        if (useProceduralGeneration) {
+            CreateProceduralFaceChunkMesh(faceIndex);
+        } else {
+            // Configurer le matériau avec couleur de debug
+            Material chunkMaterial = new Material(Shader.Find("Standard"));
+            if (showChunkDebug) {
+                chunkMaterial.color = chunkColors[faceIndex];
+            } else {
+                chunkMaterial.color = hexagonColor;
+            }
+            faceMeshRendererChunks[faceIndex].material = chunkMaterial;
+        }
+        
+        // Ajouter un collider
+        MeshCollider collider = chunkObject.AddComponent<MeshCollider>();
+        collider.sharedMesh = faceMeshChunks[faceIndex];
+        collider.convex = false;
+    }
+    
+    void CreateSubChunkMeshes(int faceIndex) {
+        // Créer les sous-chunks pour cette face
+        for (int subIndex = 0; subIndex < faceSubChunkCounts[faceIndex]; subIndex++) {
+            if (faceSubTrianglesChunks[faceIndex][subIndex].Count > 0) {
+                // Vérifier les limites du sous-chunk
+                int triangleCount = faceSubTrianglesChunks[faceIndex][subIndex].Count;
+                int vertexCount = faceSubVerticesChunks[faceIndex][subIndex].Count;
+                
+                if (triangleCount > maxTrianglesPerFaceChunk || vertexCount > maxVerticesPerFaceChunk) {
+                    Debug.LogError($"❌ Sous-chunk {faceIndex}.{subIndex} dépasse les limites! Triangles: {triangleCount}/{maxTrianglesPerFaceChunk}, Vertices: {vertexCount}/{maxVerticesPerFaceChunk}");
+                    Debug.LogError($"💡 Le sous-chunk a encore trop de vertices. Le système de division doit être amélioré.");
+                    continue;
+                }
+                
+                
+                // Créer le GameObject du sous-chunk
+                GameObject subChunkObject = new GameObject($"Icosahedron Face {faceIndex} SubChunk {subIndex}");
+                subChunkObject.transform.SetParent(transform);
+                subChunkObject.transform.localPosition = Vector3.zero;
+                subChunkObject.transform.localRotation = Quaternion.identity;
+                subChunkObject.transform.localScale = Vector3.one;
+                subChunkObject.tag = "Planet";
+                
+                // Ajouter les composants
+                MeshFilter subMeshFilter = subChunkObject.AddComponent<MeshFilter>();
+                MeshRenderer subMeshRenderer = subChunkObject.AddComponent<MeshRenderer>();
+                
+                // Stocker les références
+                faceSubMeshFilterChunks[faceIndex].Add(subMeshFilter);
+                faceSubMeshRendererChunks[faceIndex].Add(subMeshRenderer);
+                faceSubChunkObjects[faceIndex].Add(subChunkObject);
+                
+                // Créer le mesh du sous-chunk
+                Mesh subMesh = new Mesh();
+                subMesh.name = $"Icosahedron Face {faceIndex} SubChunk {subIndex} Mesh";
+                subMesh.vertices = faceSubVerticesChunks[faceIndex][subIndex].ToArray();
+                subMesh.triangles = faceSubTrianglesChunks[faceIndex][subIndex].ToArray();
+                subMesh.uv = faceSubUvsChunks[faceIndex][subIndex].ToArray();
+                subMesh.RecalculateNormals();
+                subMesh.RecalculateBounds();
+                
+                // Stocker le mesh
+                faceSubMeshChunks[faceIndex].Add(subMesh);
+                
+                // Appliquer la génération procédurale si activée
+                if (useProceduralGeneration) {
+                    CreateProceduralSubChunkMesh(faceIndex, subIndex);
+                } else {
+                    // Assigner le mesh simple
+                    subMeshFilter.mesh = subMesh;
+                    
+                    // Configurer le matériau avec couleur de debug
+                    Material chunkMaterial = new Material(Shader.Find("Standard"));
+                    if (showChunkDebug) {
+                        chunkMaterial.color = chunkColors[faceIndex];
+                    } else {
+                        chunkMaterial.color = hexagonColor;
+                    }
+                    subMeshRenderer.material = chunkMaterial;
+                }
+                
+                // Ajouter un collider
+                MeshCollider collider = subChunkObject.AddComponent<MeshCollider>();
+                collider.sharedMesh = subMesh;
+                collider.convex = false;
+            }
+        }
     }
     
     void CreateChunkMeshes() {
@@ -859,7 +1340,29 @@ public class HexasphereFill : MonoBehaviour {
     }
     
     void CleanupOldChunks() {
-        // Nettoyer les anciens chunks
+        // Nettoyer les anciens chunks par face
+        if (faceChunkObjects != null) {
+            for (int i = 0; i < faceChunkObjects.Length; i++) {
+                if (faceChunkObjects[i] != null) {
+                    DestroyImmediate(faceChunkObjects[i]);
+                }
+            }
+        }
+        
+        // Nettoyer les sous-chunks
+        if (faceSubChunkObjects != null) {
+            for (int i = 0; i < faceSubChunkObjects.Length; i++) {
+                if (faceSubChunkObjects[i] != null) {
+                    for (int j = 0; j < faceSubChunkObjects[i].Count; j++) {
+                        if (faceSubChunkObjects[i][j] != null) {
+                            DestroyImmediate(faceSubChunkObjects[i][j]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Nettoyer les anciens chunks normaux
         if (meshFilterChunks != null) {
             for (int i = 0; i < meshFilterChunks.Length; i++) {
                 if (meshFilterChunks[i] != null) {
@@ -880,6 +1383,7 @@ public class HexasphereFill : MonoBehaviour {
         for (int i = 0; i < transform.childCount; i++) {
             Transform child = transform.GetChild(i);
             if (child.name.Contains("Hexasphere Chunk") || 
+                child.name.Contains("Icosahedron Face Chunk") ||
                 child.name.Contains("Hexasphere") ||
                 child.name.Contains("Chunk") ||
                 child.name.Contains("Focus Point")) {
@@ -899,6 +1403,28 @@ public class HexasphereFill : MonoBehaviour {
         
         // Réinitialiser les variables
         chunkCount = 0;
+        
+        // Réinitialiser les tableaux de chunks par face
+        faceVerticesChunks = null;
+        faceTrianglesChunks = null;
+        faceUvsChunks = null;
+        faceMeshChunks = null;
+        faceMeshFilterChunks = null;
+        faceMeshRendererChunks = null;
+        faceChunkObjects = null;
+        faceChunkTriangleCounts = null;
+        faceChunkActive = null;
+        
+        // Réinitialiser les sous-chunks
+        faceSubVerticesChunks = null;
+        faceSubTrianglesChunks = null;
+        faceSubUvsChunks = null;
+        faceSubMeshChunks = null;
+        faceSubMeshFilterChunks = null;
+        faceSubMeshRendererChunks = null;
+        faceSubChunkObjects = null;
+        faceSubChunkCounts = null;
+        
         if (verticesChunks != null) {
             for (int i = 0; i < verticesChunks.Length; i++) {
                 if (verticesChunks[i] != null) {
@@ -934,6 +1460,42 @@ public class HexasphereFill : MonoBehaviour {
         // Dessiner le point de focus dans la scène
         if (showFocusPoint && useSelectiveSubdivision) {
             DrawFocusPointGizmo();
+        }
+        
+        // Dessiner les gizmos de debug des chunks par face
+        if (showChunkDebug && useIcosahedronChunking && faceChunkObjects != null) {
+            DrawChunkDebugGizmos();
+        }
+    }
+    
+    void DrawChunkDebugGizmos() {
+        for (int i = 0; i < faceChunkObjects.Length; i++) {
+            if (faceChunkObjects[i] != null && faceChunkActive[i]) {
+                // Dessiner un gizmo pour chaque chunk actif
+                Gizmos.color = chunkColors[i];
+                Gizmos.DrawWireSphere(faceChunkObjects[i].transform.position, 0.1f);
+                
+                // Afficher le nombre de triangles
+                if (faceChunkTriangleCounts[i] > 0) {
+                    Vector3 labelPos = faceChunkObjects[i].transform.position + Vector3.up * 0.2f;
+                    UnityEditor.Handles.Label(labelPos, $"Chunk {i}: {faceChunkTriangleCounts[i]} triangles");
+                }
+            }
+            
+            // Dessiner les sous-chunks s'ils existent
+            if (faceSubChunkObjects[i] != null && faceSubChunkObjects[i].Count > 0) {
+                for (int j = 0; j < faceSubChunkObjects[i].Count; j++) {
+                    if (faceSubChunkObjects[i][j] != null) {
+                        // Dessiner un gizmo plus petit pour les sous-chunks
+                        Gizmos.color = new Color(chunkColors[i].r, chunkColors[i].g, chunkColors[i].b, 0.5f);
+                        Gizmos.DrawWireSphere(faceSubChunkObjects[i][j].transform.position, 0.05f);
+                        
+                        // Afficher les informations du sous-chunk
+                        Vector3 subLabelPos = faceSubChunkObjects[i][j].transform.position + Vector3.up * 0.15f;
+                        UnityEditor.Handles.Label(subLabelPos, $"SubChunk {i}.{j}");
+                    }
+                }
+            }
         }
     }
     
@@ -1114,6 +1676,152 @@ public class HexasphereFill : MonoBehaviour {
         
         // Créer le mesh avec multi-matériaux
         CreateProceduralMesh(vertices, uvs, triangles);
+    }
+    
+    void ApplyProceduralGenerationToAllChunks() {
+        if (!useProceduralGeneration) return;
+        
+        // Appliquer la génération procédurale aux vertices partagés (pour tous les chunks)
+        for (int i = 0; i < faceVerticesChunks[0].Count; i++) {
+            Vector3 originalVertex = faceVerticesChunks[0][i];
+            Vector3 normalizedVertex = originalVertex.normalized;
+            
+            float height = GenerateHeight(normalizedVertex);
+            
+            // Nouveau système d'océans qui préserve la forme de base
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                if (useFlatOceans && height <= waterLevel) {
+                    height = 0f; // Océans plats au niveau 0
+                } else if (height > waterLevel) {
+                    if (forceOceanLevel) {
+                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Appliquer la hauteur au vertex
+            faceVerticesChunks[0][i] = normalizedVertex * (radius + height);
+        }
+        
+        // Mettre à jour les meshes des chunks normaux
+        int updatedChunks = 0;
+        for (int faceIndex = 0; faceIndex < 20; faceIndex++) {
+            if (faceChunkTriangleCounts[faceIndex] > 0 && faceMeshChunks[faceIndex] != null) {
+                faceMeshChunks[faceIndex].vertices = faceVerticesChunks[0].ToArray();
+                faceMeshChunks[faceIndex].RecalculateNormals();
+                faceMeshChunks[faceIndex].RecalculateBounds();
+                
+                // Mettre à jour le mesh du MeshFilter
+                if (faceMeshFilterChunks[faceIndex] != null) {
+                    faceMeshFilterChunks[faceIndex].mesh = faceMeshChunks[faceIndex];
+                    
+                    // Appliquer les textures procédurales au chunk normal
+                    CreateProceduralFaceChunkMesh(faceIndex);
+                    
+                    updatedChunks++;
+                }
+            }
+        }
+        
+        if (updatedChunks > 0) {
+            Debug.Log($"🔄 {updatedChunks} chunks normaux mis à jour");
+        }
+        
+        // Appliquer la génération procédurale aux sous-chunks
+        int updatedSubChunks = 0;
+        for (int faceIndex = 0; faceIndex < 20; faceIndex++) {
+            if (faceSubChunkCounts[faceIndex] > 0) {
+                for (int subIndex = 0; subIndex < faceSubChunkCounts[faceIndex]; subIndex++) {
+                    if (faceSubTrianglesChunks[faceIndex][subIndex].Count > 0) {
+                        // Appliquer la génération procédurale aux vertices de ce sous-chunk
+                        for (int i = 0; i < faceSubVerticesChunks[faceIndex][subIndex].Count; i++) {
+                            Vector3 originalVertex = faceSubVerticesChunks[faceIndex][subIndex][i];
+                            Vector3 normalizedVertex = originalVertex.normalized;
+                            
+                            float height = GenerateHeight(normalizedVertex);
+                            
+                            // Nouveau système d'océans qui préserve la forme de base
+                            if (useAdvancedOceanSystem && preserveBaseShape) {
+                                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+                            } else {
+                                // Ancien système (pour compatibilité)
+                                if (useFlatOceans && height <= waterLevel) {
+                                    height = 0f; // Océans plats au niveau 0
+                                } else if (height > waterLevel) {
+                                    if (forceOceanLevel) {
+                                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                                    }
+                                }
+                            }
+                            
+                            // Appliquer la hauteur au vertex
+                            faceSubVerticesChunks[faceIndex][subIndex][i] = normalizedVertex * (radius + height);
+                        }
+                        
+                        // Mettre à jour le mesh du sous-chunk
+                        if (faceSubMeshChunks[faceIndex].Count > subIndex && faceSubMeshChunks[faceIndex][subIndex] != null) {
+                            faceSubMeshChunks[faceIndex][subIndex].vertices = faceSubVerticesChunks[faceIndex][subIndex].ToArray();
+                            faceSubMeshChunks[faceIndex][subIndex].RecalculateNormals();
+                            faceSubMeshChunks[faceIndex][subIndex].RecalculateBounds();
+                            
+                            // Mettre à jour le mesh du MeshFilter
+                            if (faceSubMeshFilterChunks[faceIndex].Count > subIndex && faceSubMeshFilterChunks[faceIndex][subIndex] != null) {
+                                faceSubMeshFilterChunks[faceIndex][subIndex].mesh = faceSubMeshChunks[faceIndex][subIndex];
+                                
+                                // Appliquer les matériaux procéduraux au sous-chunk
+                                CreateProceduralSubChunkMesh(faceIndex, subIndex);
+                                
+                                updatedSubChunks++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (updatedSubChunks > 0) {
+            Debug.Log($"🔄 {updatedSubChunks} sous-chunks mis à jour");
+        }
+    }
+    
+    void ApplyProceduralGenerationToMainMesh() {
+        if (!useProceduralGeneration || meshFilter == null || meshFilter.mesh == null) return;
+        
+        // Récupérer les vertices du mesh principal
+        Vector3[] vertices = meshFilter.mesh.vertices;
+        
+        // Appliquer la génération procédurale aux vertices
+        for (int i = 0; i < vertices.Length; i++) {
+            Vector3 originalVertex = vertices[i];
+            Vector3 normalizedVertex = originalVertex.normalized;
+            
+            float height = GenerateHeight(normalizedVertex);
+            
+            // Nouveau système d'océans qui préserve la forme de base
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                if (useFlatOceans && height <= waterLevel) {
+                    height = 0f; // Océans plats au niveau 0
+                } else if (height > waterLevel) {
+                    if (forceOceanLevel) {
+                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Appliquer la hauteur au vertex
+            vertices[i] = normalizedVertex * (radius + height);
+        }
+        
+        // Mettre à jour le mesh
+        meshFilter.mesh.vertices = vertices;
+        meshFilter.mesh.RecalculateNormals();
+        meshFilter.mesh.RecalculateBounds();
     }
     
     void ApplyProceduralGenerationToChunks() {
@@ -1330,6 +2038,158 @@ public class HexasphereFill : MonoBehaviour {
         
         // Appliquer les matériaux de planète
         ApplyPlanetMaterialsToChunk(chunkIndex);
+    }
+    
+    void CreateProceduralFaceChunkMesh(int chunkIndex) {
+        // Séparer les triangles par type de terrain pour ce chunk par face
+        List<int> waterTriangles = new List<int>();
+        List<int> landTriangles = new List<int>();
+        List<int> mountainTriangles = new List<int>();
+        
+        for (int i = 0; i < faceTrianglesChunks[chunkIndex].Count; i += 3) {
+            int p1 = faceTrianglesChunks[chunkIndex][i];
+            int p2 = faceTrianglesChunks[chunkIndex][i + 1];
+            int p3 = faceTrianglesChunks[chunkIndex][i + 2];
+            
+            // Calculer l'altitude moyenne du triangle
+            float avgHeight = (GetVertexHeight(faceVerticesChunks[0][p1]) + 
+                              GetVertexHeight(faceVerticesChunks[0][p2]) + 
+                              GetVertexHeight(faceVerticesChunks[0][p3])) / 3f;
+            
+            // Assigner au bon type de terrain
+            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+                waterTriangles.Add(p1);
+                waterTriangles.Add(p2);
+                waterTriangles.Add(p3);
+            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+                landTriangles.Add(p1);
+                landTriangles.Add(p2);
+                landTriangles.Add(p3);
+            } else {
+                mountainTriangles.Add(p1);
+                mountainTriangles.Add(p2);
+                mountainTriangles.Add(p3);
+            }
+        }
+        
+        // Créer le mesh avec submeshes
+        Mesh chunkMesh = new Mesh();
+        chunkMesh.name = $"Icosahedron Face Chunk {chunkIndex} Planet";
+        chunkMesh.vertices = faceVerticesChunks[0].ToArray();
+        chunkMesh.uv = faceUvsChunks[0].ToArray();
+        
+        // Créer les submeshes
+        chunkMesh.subMeshCount = 3;
+        chunkMesh.SetTriangles(waterTriangles.ToArray(), 0);
+        chunkMesh.SetTriangles(landTriangles.ToArray(), 1);
+        chunkMesh.SetTriangles(mountainTriangles.ToArray(), 2);
+        
+        chunkMesh.RecalculateNormals();
+        chunkMesh.RecalculateBounds();
+        
+        // Appliquer le mesh
+        faceMeshFilterChunks[chunkIndex].mesh = chunkMesh;
+        
+        // Appliquer les matériaux de planète
+        ApplyPlanetMaterialsToFaceChunk(chunkIndex);
+    }
+    
+    void CreateProceduralSubChunkMesh(int faceIndex, int subIndex) {
+        // Séparer les triangles par type de terrain pour ce sous-chunk
+        List<int> waterTriangles = new List<int>();
+        List<int> landTriangles = new List<int>();
+        List<int> mountainTriangles = new List<int>();
+        
+        for (int i = 0; i < faceSubTrianglesChunks[faceIndex][subIndex].Count; i += 3) {
+            int p1 = faceSubTrianglesChunks[faceIndex][subIndex][i];
+            int p2 = faceSubTrianglesChunks[faceIndex][subIndex][i + 1];
+            int p3 = faceSubTrianglesChunks[faceIndex][subIndex][i + 2];
+            
+            // Calculer l'altitude moyenne du triangle
+            float avgHeight = (GetVertexHeight(faceSubVerticesChunks[faceIndex][subIndex][p1]) + 
+                              GetVertexHeight(faceSubVerticesChunks[faceIndex][subIndex][p2]) + 
+                              GetVertexHeight(faceSubVerticesChunks[faceIndex][subIndex][p3])) / 3f;
+            
+            // Assigner au bon type de terrain
+            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+                waterTriangles.Add(p1);
+                waterTriangles.Add(p2);
+                waterTriangles.Add(p3);
+            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+                landTriangles.Add(p1);
+                landTriangles.Add(p2);
+                landTriangles.Add(p3);
+            } else {
+                mountainTriangles.Add(p1);
+                mountainTriangles.Add(p2);
+                mountainTriangles.Add(p3);
+            }
+        }
+        
+        // Utiliser le mesh existant et le modifier
+        Mesh subChunkMesh = faceSubMeshChunks[faceIndex][subIndex];
+        if (subChunkMesh == null) {
+            subChunkMesh = new Mesh();
+            subChunkMesh.name = $"Icosahedron Face {faceIndex} SubChunk {subIndex} Planet";
+            faceSubMeshChunks[faceIndex][subIndex] = subChunkMesh;
+        }
+        
+        // Mettre à jour les vertices et UVs (déjà modifiés par la génération procédurale)
+        subChunkMesh.vertices = faceSubVerticesChunks[faceIndex][subIndex].ToArray();
+        subChunkMesh.uv = faceSubUvsChunks[faceIndex][subIndex].ToArray();
+        
+        // Créer les submeshes
+        subChunkMesh.subMeshCount = 3;
+        subChunkMesh.SetTriangles(waterTriangles.ToArray(), 0);
+        subChunkMesh.SetTriangles(landTriangles.ToArray(), 1);
+        subChunkMesh.SetTriangles(mountainTriangles.ToArray(), 2);
+        
+        subChunkMesh.RecalculateNormals();
+        subChunkMesh.RecalculateBounds();
+        
+        // Appliquer le mesh
+        faceSubMeshFilterChunks[faceIndex][subIndex].mesh = subChunkMesh;
+        
+        // Appliquer les matériaux de planète
+        ApplyPlanetMaterialsToSubChunk(faceIndex, subIndex);
+    }
+    
+    void ApplyPlanetMaterialsToSubChunk(int faceIndex, int subIndex) {
+        if (faceSubMeshRendererChunks[faceIndex][subIndex] == null) return;
+        
+        // Créer des matériaux par défaut si aucun n'est assigné
+        if (waterMaterial == null) {
+            waterMaterial = CreateDefaultMaterial(Color.blue, "Water");
+        }
+        if (landMaterial == null) {
+            landMaterial = CreateDefaultMaterial(Color.green, "Land");
+        }
+        if (mountainMaterial == null) {
+            mountainMaterial = CreateDefaultMaterial(Color.gray, "Mountain");
+        }
+        
+        // Assigner les matériaux
+        Material[] materials = { waterMaterial, landMaterial, mountainMaterial };
+        faceSubMeshRendererChunks[faceIndex][subIndex].materials = materials;
+    }
+    
+    void ApplyPlanetMaterialsToFaceChunk(int chunkIndex) {
+        if (faceMeshRendererChunks[chunkIndex] == null) return;
+        
+        // Créer des matériaux par défaut si aucun n'est assigné
+        if (waterMaterial == null) {
+            waterMaterial = CreateDefaultMaterial(Color.blue, "Water");
+        }
+        if (landMaterial == null) {
+            landMaterial = CreateDefaultMaterial(Color.green, "Land");
+        }
+        if (mountainMaterial == null) {
+            mountainMaterial = CreateDefaultMaterial(Color.gray, "Mountain");
+        }
+        
+        // Assigner les matériaux
+        Material[] materials = { waterMaterial, landMaterial, mountainMaterial };
+        faceMeshRendererChunks[chunkIndex].materials = materials;
     }
     
     void ApplyPlanetMaterialsToChunk(int chunkIndex) {

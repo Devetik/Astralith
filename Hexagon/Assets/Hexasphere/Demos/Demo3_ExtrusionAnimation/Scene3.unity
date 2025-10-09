@@ -638,83 +638,6 @@ LightingSettings:
   m_PVRFilteringAtrousPositionSigmaIndirect: 2
   m_PVRFilteringAtrousPositionSigmaAO: 1
   m_RespectSceneVisibilityWhenBakingGI: 0
---- !u!1 &1129399815
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1129399817}
-  - component: {fileID: 1129399816}
-  m_Layer: 0
-  m_Name: HexaTest
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &1129399816
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1129399815}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 407f2602afdcf334389b3d904dd8b8ea, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  divisions: 3
-  radius: 1
-  generateOnStart: 1
-  showDebugInfo: 1
-  showWireframe: 0
-  fixTriangleOrientation: 1
-  useSphericalUVs: 1
-  useChunking: 1
-  maxVerticesPerChunk: 65500
-  maxChunks: 100
-  useLOD: 0
-  lodDistance: 10
-  lodCamera: {fileID: 0}
-  useVisibilityLOD: 0
-  visibilityAngle: 90
-  frontLODDivisions: 5
-  backLODDivisions: 1
-  useFrustumCulling: 1
-  useOptimizedVisibility: 1
-  visibilityUpdateInterval: 5
-  useFrustumCone: 1
-  frustumNearDistance: 0.1
-  frustumFarDistance: 1000
-  frustumAspectRatio: 1
-  showFrustumDebug: 0
-  useSectorLOD: 0
-  sectorCount: 12
-  highLODSectors: 4
-  mediumLODSectors: 4
-  lowLODSectors: 4
-  showSectorDebug: 0
-  hexagonMaterial: {fileID: 2100000, guid: a0a9fe1ad2a821d42aafb9412a87d1bb, type: 2}
-  hexagonColor: {r: 0, g: 0, b: 1, a: 1}
---- !u!4 &1129399817
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1129399815}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.16, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1379864727
 GameObject:
   m_ObjectHideFlags: 0
@@ -744,29 +667,82 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 705339d84aacbad4791da324596944fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  divisions: 3
-  radius: 1
-  generateOnStart: 1
-  showDebugInfo: 1
-  showWireframe: 0
-  hexagonMaterial: {fileID: 0}
-  hexagonColor: {r: 0, g: 0, b: 1, a: 1}
-  fixTriangleOrientation: 1
-  useSphericalUVs: 1
-  useChunking: 1
-  maxVerticesPerChunk: 65000
-  maxChunks: 100
   useSelectiveSubdivision: 1
-  focusPoint: {x: 0, y: 0, z: 3.06}
-  focusRadius: 0.5
-  focusDivisions: 5
-  backgroundDivisions: 1
+  focusPoint: {x: 0.8194865, y: 0.016779698, z: -0.57285273}
+  focusRadius: 1.6
+  focusDivisions: 4
+  backgroundDivisions: 6
   showFocusDebug: 0
   showFocusPoint: 1
   focusPointColor: {r: 1, g: 0, b: 0, a: 1}
   focusPointSize: 0.1
-  useDynamicSubdivision: 1
-  dynamicFocusTarget: {fileID: 0}
+  divisions: 5
+  radius: 1
+  generateOnStart: 1
+  showDebugInfo: 1
+  showWireframe: 0
+  hexagonMaterial: {fileID: 2100000, guid: ec08895d456e6694282810f940bfe9de, type: 2}
+  hexagonColor: {r: 0, g: 0, b: 1, a: 1}
+  fixTriangleOrientation: 1
+  useSphericalUVs: 1
+  useProceduralGeneration: 1
+  noiseScale: 1
+  heightAmplitude: 1
+  useAdvancedNoise: 1
+  baseNoiseScale: 1
+  baseOctaves: 7
+  basePersistence: 0.54
+  baseLacunarity: 2
+  detailNoiseScale: 3.22
+  detailOctaves: 3
+  detailPersistence: 0.3
+  detailLacunarity: 2
+  useRidgeNoise: 1
+  ridgeNoiseScale: 0.5
+  ridgeIntensity: 0.3
+  waterLevel: 0.87
+  mountainLevel: 0.91
+  useFlatOceans: 1
+  forceOceanLevel: 1
+  useAdvancedOceanSystem: 1
+  preserveBaseShape: 1
+  oceanFlatteningStrength: 1
+  waterMaterial: {fileID: 2100000, guid: 1a51515bccc847f4cac18f79cd5bfbc4, type: 2}
+  landMaterial: {fileID: 2100000, guid: a0a9fe1ad2a821d42aafb9412a87d1bb, type: 2}
+  mountainMaterial: {fileID: 2100000, guid: ec08895d456e6694282810f940bfe9de, type: 2}
+  useChunking: 1
+  maxVerticesPerChunk: 65000
+  maxChunks: 100
+  useIcosahedronChunking: 1
+  showChunkDebug: 0
+  chunkColors:
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0, g: 0, b: 0, a: 0}
+  useChunkProtection: 1
+  maxVerticesPerFaceChunk: 65000
+  maxTrianglesPerFaceChunk: 100000
+  autoSplitLargeChunks: 1
+  maxSubChunksPerFace: 4
+  useDynamicSubdivision: 0
+  dynamicFocusTarget: {fileID: 1559964997}
   updateThreshold: 0.1
   updateInterval: 0.5
   smoothTransition: 1
@@ -778,6 +754,7 @@ MonoBehaviour:
   autoSubdivisionRadius: 0.3
   maxAutoSubdivisions: 3
   subdivisionThreshold: 0.1
+  updateCooldown: 0.1
   showAutoSubdivisionDebug: 0
   useAutoReduction: 1
   reductionRadius: 0.5
@@ -792,7 +769,7 @@ Transform:
   m_GameObject: {fileID: 1379864727}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 1.263}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -812,6 +789,7 @@ GameObject:
   - component: {fileID: 1559964993}
   - component: {fileID: 1559964998}
   - component: {fileID: 1559964999}
+  - component: {fileID: 1559965000}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -952,7 +930,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1559964992}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 50db5c9d971788541beb8ac84b7f0eaf, type: 3}
   m_Name: 
@@ -982,6 +960,42 @@ MonoBehaviour:
   currentDistance: 0
   targetRotation: {x: 0, y: 0, z: 0}
   targetDistance: 0
+--- !u!114 &1559965000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1559964992}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b5331bcee126d4680d5a7d6d1fd900, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetPlanet: {fileID: 0}
+  autoFindPlanet: 1
+  rotationSpeed: 2
+  zoomSpeed: 20
+  minDistance: 0.5
+  maxDistance: 500
+  defaultDistance: 3
+  keepNorthUp: 1
+  smoothRotation: 5
+  smoothZoom: 5
+  resetCameraKey: 114
+  focusPlanetKey: 102
+  orbitAroundKey: 324
+  freeLookKey: 325
+  clickMaxDuration: 0.2
+  clickMaxMovement: 5
+  cameraMoveSpeed: 2
+  smoothCameraTransition: 1
+  animationDuration: 1
+  acceptableDistanceRange: 2
+  currentRotation: {x: 0, y: 0, z: 0}
+  currentDistance: 0
+  targetRotation: {x: 0, y: 0, z: 0}
+  targetDistance: 0
 --- !u!1 &1652394923
 GameObject:
   m_ObjectHideFlags: 0
@@ -998,7 +1012,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1652394925
 Transform:
   m_ObjectHideFlags: 0
@@ -1008,7 +1022,7 @@ Transform:
   m_GameObject: {fileID: 1652394923}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -6.31, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1109,5 +1123,4 @@ SceneRoots:
   - {fileID: 898969038}
   - {fileID: 993790995}
   - {fileID: 896646341}
-  - {fileID: 1129399817}
   - {fileID: 1379864729}
