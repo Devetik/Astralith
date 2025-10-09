@@ -39,8 +39,7 @@ namespace HexasphereProcedural {
         [SerializeField] public float animationDuration = 1f; // Durée fixe de 1 seconde
         [SerializeField] public float acceptableDistanceRange = 2f; // Range de distance acceptable
         
-        [Header("🎨 Interface")]
-        [SerializeField] public bool showDebugInfo = true;
+
         
         [Header("📷 État Caméra")]
         [SerializeField] private Vector3 currentRotation;
@@ -578,10 +577,7 @@ namespace HexasphereProcedural {
             if (keepNorthUp && !isFreeLooking) {
                 KeepNorthUp();
             }
-            
-            // Log de debug pour la position
-            if (showDebugInfo && Time.frameCount % 120 == 0) { // Log toutes les 120 frames
-            }
+
         }
         
         void KeepNorthUp() {
@@ -634,12 +630,7 @@ namespace HexasphereProcedural {
         void FindNearestPlanet() {
             // Chercher par nom d'abord (plus fiable)
             GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-            foreach (GameObject obj in allObjects) {
-                if (obj.name.Contains("Planet") || obj.name.Contains("HexaAstralith")) {
-                    SetTargetPlanet(obj.transform);
-                    return;
-                }
-            }
+
             
             // Si pas trouvé par nom, chercher par tag (si le tag existe)
             try {
@@ -654,63 +645,7 @@ namespace HexasphereProcedural {
             
         }
         
-        void OnGUI() {
-            // Interface minimale pour le debug
-            if (!showDebugInfo) return;
-            
-            GUILayout.BeginArea(new Rect(10, 10, 250, 200));
-            GUILayout.BeginVertical("box");
-            
-            GUILayout.Label("📷 Caméra Planète", GUI.skin.box);
-            GUILayout.Space(5);
-            
-            // Statut de la planète
-            GUILayout.Label($"Planète: {(hasSelectedPlanet ? "✅" : "❌")}");
-            if (hasSelectedPlanet && targetPlanet != null) {
-                GUILayout.Label($"Nom: {targetPlanet.name}");
-                GUILayout.Label($"Distance: {currentDistance:F1}");
-            }
-            
-            GUILayout.Space(5);
-            
-            // Contrôles
-            GUILayout.Label("Contrôles:");
-            GUILayout.Label("🖱️ Clic simple: Sélectionner planète");
-            GUILayout.Label("🖱️ Clic gauche maintenu: Orientation libre");
-            GUILayout.Label("🖱️ Clic droit: Orbite autour");
-            GUILayout.Label("🖱️ Molette: Zoom");
-            GUILayout.Label("⌨️ R: Reset | F: Focus");
-            GUILayout.Label("⌨️ S: Sélection auto");
-            
-            GUILayout.Space(5);
-            
-            // Animation
-            GUILayout.Label("Animation:");
-            smoothCameraTransition = GUILayout.Toggle(smoothCameraTransition, "Transition fluide");
-            if (GUILayout.Button("Durée: " + animationDuration.ToString("F1") + "s")) {
-                animationDuration = animationDuration >= 2f ? 0.5f : animationDuration + 0.5f;
-            }
-            if (GUILayout.Button("Range: " + acceptableDistanceRange.ToString("F1"))) {
-                acceptableDistanceRange = acceptableDistanceRange >= 5f ? 1f : acceptableDistanceRange + 1f;
-            }
-            if (GUILayout.Button("Vitesse: " + cameraMoveSpeed.ToString("F1"))) {
-                cameraMoveSpeed = cameraMoveSpeed >= 5f ? 1f : cameraMoveSpeed + 1f;
-            }
-            
-            GUILayout.Space(5);
-            
-            // Debug
-            GUILayout.Label("Debug:");
-            GUILayout.Label($"Orbite: {(isOrbiting ? "ON" : "OFF")}");
-            GUILayout.Label($"FreeLook: {(isFreeLooking ? "ON" : "OFF")}");
-            GUILayout.Label($"Clicking: {(isClicking ? "ON" : "OFF")}");
-            GUILayout.Label($"Moving: {(isMovingToPlanet ? "ON" : "OFF")}");
-            GUILayout.Label($"Pointing: {(isPointingToPlanet ? "ON" : "OFF")}");
-            GUILayout.Label($"Planète: {(hasSelectedPlanet ? "Sélectionnée" : "Aucune")}");
-            
-            GUILayout.EndVertical();
-            GUILayout.EndArea();
-        }
+
         
         void OnDrawGizmos() {
             if (!hasSelectedPlanet || targetPlanet == null) return;
