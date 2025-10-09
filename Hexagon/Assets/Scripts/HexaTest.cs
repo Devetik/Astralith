@@ -165,7 +165,6 @@ namespace HexasphereTest {
             originalDivisions = 0;
             currentLODDivisions = 0;
             lastLODDistance = -1f;
-            Debug.Log("🎯 LOD réinitialisé");
         }
         
         void CreateIcosahedron() {

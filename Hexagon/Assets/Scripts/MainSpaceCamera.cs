@@ -259,7 +259,6 @@ namespace HexasphereProcedural {
             if (planet.name.Contains("Chunk")) {
                 Transform parent = planet.parent;
                 if (parent != null && parent.GetComponent<HexasphereFill>() != null) {
-                    Debug.Log($"🎯 Chunk détecté, ciblage du parent HexasphereFill: {parent.name}");
                     planet = parent;
                 }
             }
@@ -285,7 +284,6 @@ namespace HexasphereProcedural {
             HexasphereFill hexasphereFill = targetPlanet.GetComponent<HexasphereFill>();
             if (hexasphereFill != null) {
                 planetRadius = hexasphereFill.radius;
-                Debug.Log($"🌍 HexasphereFill: Centre={planetCenter}, Radius={planetRadius:F2}");
             } else {
                 // Pour les autres planètes, estimer le rayon
                 Renderer renderer = targetPlanet.GetComponent<Renderer>();
@@ -294,7 +292,6 @@ namespace HexasphereProcedural {
                 } else {
                     planetRadius = Mathf.Max(targetPlanet.localScale.magnitude / 2f, 1f);
                 }
-                Debug.Log($"🌍 Autre planète: Centre={planetCenter}, Rayon={planetRadius:F2}");
             }
             
             // Ajuster la distance minimale et maximale basée sur la taille de la planète
@@ -306,9 +303,7 @@ namespace HexasphereProcedural {
             if (currentDistance == 0f) {
                 currentDistance = defaultDistance;
                 targetDistance = defaultDistance;
-            }
-            
-            Debug.Log($"🌍 Planète info finale: Centre={planetCenter}, Rayon={planetRadius:F2}, Distance={currentDistance:F2}");
+            }         
         }
         
         void SetupCameraAroundPlanet() {
@@ -335,7 +330,6 @@ namespace HexasphereProcedural {
             // Pour HexasphereFill, éviter l'animation qui peut causer des problèmes
             HexasphereFill hexasphereFill = targetPlanet.GetComponent<HexasphereFill>();
             if (hexasphereFill != null) {
-                Debug.Log($"🎯 HexasphereFill sélectionné: {targetPlanet.name}");
                 
                 // Pas d'animation pour HexasphereFill, juste pointer directement
                 Vector3 directionToPlanet = (planetCenter - transform.position).normalized;
@@ -574,11 +568,6 @@ namespace HexasphereProcedural {
                 if (isOrbiting) {
                     // Mode orbite : regarder la planète
                     transform.LookAt(planetCenter);
-                    
-                    // Debug pour HexasphereFill
-                    if (targetPlanet != null && targetPlanet.GetComponent<HexasphereFill>() != null) {
-                        Debug.Log($"🔄 UpdateCamera Orbite: Centre={planetCenter}, Position={transform.position}, Direction={direction}");
-                    }
                 } else {
                     // Mode normal : regarder la planète
                     transform.LookAt(planetCenter);

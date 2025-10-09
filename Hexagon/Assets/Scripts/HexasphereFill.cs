@@ -790,11 +790,6 @@ public class HexasphereFill : MonoBehaviour {
                 meshChunks[i].RecalculateNormals();
                 meshChunks[i].RecalculateBounds();
                 
-                // Debug : vérifier les coordonnées des vertices
-                if (verticesChunks[i].Count > 0) {
-                    Vector3 firstVertex = verticesChunks[i][0];
-                    Debug.Log($"🔷 Chunk {i}: Premier vertex = {firstVertex}, Position chunk = {chunkObject.transform.localPosition}");
-                }
                 
                 // Assigner le mesh
                 meshFilterChunks[i].mesh = meshChunks[i];

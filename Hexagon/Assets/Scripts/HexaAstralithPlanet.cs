@@ -219,7 +219,6 @@ namespace HexasphereProcedural {
             
             // Choisir la méthode de subdivision (priorité à la subdivision intelligente)
             if (useIntelligentSubdivision && divisions > maxSafeDivisions) {
-                Debug.Log($"🎯 Utilisation de la subdivision intelligente pour {divisions} divisions");
                 CreateIntelligentSubdivision(baseVertices, baseTriangles, divisions);
             } else if (useHexagonSubdivision && divisions > maxSafeDivisions) {
                 Debug.Log($"🔷 Utilisation de la subdivision hexagone pour {divisions} divisions");
@@ -256,7 +255,6 @@ namespace HexasphereProcedural {
                     }
                     
                     SubdivideSphere(baseVertices, baseTriangles);
-                    Debug.Log($"📊 Division {division}: {baseVertices.Count} vertices, {baseTriangles.Count/3} triangles");
                 }
             }
             
@@ -264,7 +262,6 @@ namespace HexasphereProcedural {
             ApplyHeightsToMesh(baseVertices, baseTriangles, vertices, uvs, triangles);
             
             // Vérification du mesh généré
-            Debug.Log($"✅ Mesh généré: {vertices.Count} vertices, {triangles.Count/3} triangles");
             if (vertices.Count == 0) {
                 Debug.LogError("❌ ERREUR: Aucun vertex généré !");
             }
@@ -282,7 +279,6 @@ namespace HexasphereProcedural {
             int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
             for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(vertices, triangles);
-                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
             }
             
             // Subdivision hexagone pour les divisions restantes
@@ -311,7 +307,6 @@ namespace HexasphereProcedural {
                     }
                     
                     SubdivideHexagonStyle(vertices, triangles);
-                    Debug.Log($"📊 Division hexagone {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
                 }
             }
         }
@@ -417,19 +412,16 @@ namespace HexasphereProcedural {
         // === MÉTHODES DE SUBDIVISION INTELLIGENTE ===
         
         void CreateIntelligentSubdivision(List<Vector3> vertices, List<int> triangles, int targetDivisions) {
-            Debug.Log($"🎯 Début subdivision intelligente pour {targetDivisions} divisions");
             
             // Subdivision classique jusqu'à la limite sûre
             int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
             for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(vertices, triangles);
-                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
             }
             
             // Subdivision intelligente pour les divisions restantes
             int remainingDivisions = targetDivisions - safeDivisions;
             if (remainingDivisions > 0) {
-                Debug.Log($"🎯 Subdivision intelligente pour {remainingDivisions} divisions restantes");
                 for (int i = 0; i < remainingDivisions; i++) {
                     // Limite de sécurité basée sur la qualité
                     int qualityLimit = Mathf.RoundToInt(maxVerticesLimit * subdivisionQuality);
@@ -439,7 +431,6 @@ namespace HexasphereProcedural {
                     }
                     
                     SubdivideIntelligent(vertices, triangles);
-                    Debug.Log($"📊 Division intelligente {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
                 }
             }
         }
@@ -523,7 +514,6 @@ namespace HexasphereProcedural {
             int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
             for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(vertices, triangles);
-                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
             }
             
             // Subdivision Hexasphere pour les divisions restantes
@@ -543,7 +533,6 @@ namespace HexasphereProcedural {
                     }
                     
                     SubdivideHexasphereStyle(vertices, triangles);
-                    Debug.Log($"📊 Division Hexasphere {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
                 }
             }
         }
@@ -650,7 +639,6 @@ namespace HexasphereProcedural {
             int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
             for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(vertices, triangles);
-                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
             }
             
             // Subdivision simple pour les divisions restantes
@@ -659,7 +647,6 @@ namespace HexasphereProcedural {
                 Debug.Log($"🔺 Subdivision simple pour {remainingDivisions} divisions restantes");
                 for (int i = 0; i < remainingDivisions; i++) {
                     SubdivideSimple(vertices, triangles);
-                    Debug.Log($"📊 Division simple {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
                 }
             }
         }
@@ -719,7 +706,6 @@ namespace HexasphereProcedural {
             int safeDivisions = Mathf.Min(targetDivisions, maxSafeDivisions);
             for (int division = 0; division < safeDivisions; division++) {
                 SubdivideSphere(vertices, triangles);
-                Debug.Log($"📊 Division classique {division}: {vertices.Count} vertices, {triangles.Count/3} triangles");
             }
             
             // Subdivision triangulaire pour les divisions restantes
@@ -728,7 +714,6 @@ namespace HexasphereProcedural {
                 Debug.Log($"🔺 Subdivision triangulaire pour {remainingDivisions} divisions restantes");
                 for (int i = 0; i < remainingDivisions; i++) {
                     SubdivideTriangular(vertices, triangles);
-                    Debug.Log($"📊 Division triangulaire {i}: {vertices.Count} vertices, {triangles.Count/3} triangles");
                 }
             }
         }
@@ -827,7 +812,6 @@ namespace HexasphereProcedural {
                     break;
                 }
                 SubdivideSphere(baseVertices, baseTriangles);
-                Debug.Log($"📊 Division {division}: {baseVertices.Count} vertices, {baseTriangles.Count/3} triangles");
             }
             
             // Appliquer les hauteurs
@@ -1035,7 +1019,6 @@ namespace HexasphereProcedural {
             // Appliquer les matériaux
             ApplyMultiMaterials();
             
-            Debug.Log($"🎨 Planète créée: {waterTriangles.Count/3} triangles eau, {landTriangles.Count/3} triangles terre, {mountainTriangles.Count/3} triangles montagne");
         }
         
         float GetVertexHeight(Vector3 vertex) {
@@ -1061,7 +1044,6 @@ namespace HexasphereProcedural {
             Material[] materials = { waterMaterial, landMaterial, mountainMaterial };
             meshRenderer.materials = materials;
             
-            Debug.Log("🎨 Matériaux de la planète appliqués !");
         }
         
         // Méthodes de génération de sphère
@@ -1182,7 +1164,6 @@ namespace HexasphereProcedural {
             waterLevel = minHeight + (range * 0.3f);
             mountainLevel = minHeight + (range * 0.7f);
             
-            Debug.Log($"📊 Niveaux calculés: Min={minHeight:F2}, Max={maxHeight:F2}, Eau={waterLevel:F2}, Montagne={mountainLevel:F2}");
         }
         
         void OnGUI() {
@@ -1498,7 +1479,6 @@ namespace HexasphereProcedural {
             }
             
             if (showDebugInfo) {
-                Debug.Log($"🎯 LOD changé vers niveau {lodLevel} (distance: {currentDistance:F1})");
             }
         }
         
@@ -1801,7 +1781,6 @@ namespace HexasphereProcedural {
         // Méthode pour afficher les informations de debug
         public void ShowDivisionInfo() {
             int expectedVertices = CalculateExpectedVertices(divisions);
-            Debug.Log($"📊 Informations pour {divisions} divisions:");
             Debug.Log($"   Vertices attendus: {expectedVertices:N0}");
             Debug.Log($"   Triangles attendus: {expectedVertices * 2 / 3:N0}");
             Debug.Log($"   Limite de sécurité: 100,000 vertices");
