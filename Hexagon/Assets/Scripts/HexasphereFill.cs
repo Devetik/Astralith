@@ -132,9 +132,6 @@ public class HexasphereFill : MonoBehaviour {
             Camera mainCamera = Camera.main;
             if (mainCamera != null) {
                 dynamicFocusTarget = mainCamera.transform;
-                Debug.Log("🔄 Cible dynamique automatique: Camera principale");
-            } else {
-                Debug.LogWarning("🔄 Aucune caméra principale trouvée. Assignez manuellement dynamicFocusTarget.");
             }
         }
     }
@@ -160,17 +157,11 @@ public class HexasphereFill : MonoBehaviour {
         
         // Gérer la subdivision automatique (indépendante de useSelectiveSubdivision)
         if (useAutoSubdivision) {
-            if (showAutoSubdivisionDebug) {
-                Debug.Log("🎯 Appel UpdateAutoSubdivision");
-            }
             UpdateAutoSubdivision();
-        } else if (showAutoSubdivisionDebug) {
-            Debug.Log("🎯 Subdivision automatique désactivée");
-        }
+        } 
     }
     
     public void GenerateHexasphere() {
-        Debug.Log($"🔷 Génération Hexasphere avec {divisions} divisions");
         
         // Nettoyer les anciens chunks
         CleanupOldChunks();
@@ -187,8 +178,6 @@ public class HexasphereFill : MonoBehaviour {
         } else {
             GenerateMeshSingle();
         }
-        
-        Debug.Log($"🔷 Hexasphere généré: {points.Count} points, {triangles.Count} triangles");
     }
     
     void CreateIcosahedron() {
@@ -233,8 +222,6 @@ public class HexasphereFill : MonoBehaviour {
                 vertices[indices[i + 2]]
             ));
         }
-        
-        Debug.Log($"🔷 Icosaèdre créé: {points.Count} points, {triangles.Count} triangles");
     }
     
     void ApplySubdivisions() {
@@ -266,7 +253,6 @@ public class HexasphereFill : MonoBehaviour {
             }
             
             triangles = newTriangles;
-            Debug.Log($"🔷 Subdivision uniforme {i + 1}: {points.Count} points, {triangles.Count} triangles");
         }
     }
     
@@ -288,8 +274,6 @@ public class HexasphereFill : MonoBehaviour {
             
             triangles = newTriangles;
         }
-        
-        Debug.Log($"🔷 Subdivision de base: {triangles.Count} triangles");
         
         // Ensuite, appliquer les subdivisions supplémentaires dans la zone de focus
         for (int i = 0; i < focusDivisions - backgroundDivisions; i++) {
@@ -314,7 +298,6 @@ public class HexasphereFill : MonoBehaviour {
             }
             
             triangles = newTriangles;
-            Debug.Log($"🔷 Subdivision focus {i + 1}: {triangles.Count} triangles");
         }
     }
     
@@ -362,7 +345,6 @@ public class HexasphereFill : MonoBehaviour {
             triangles[i] = new Triangle(newPoints[0], newPoints[1], newPoints[2]);
         }
         
-        Debug.Log($"🔷 Points normalisés: {points.Count} points sur la sphère");
     }
     
     void CreateFocusPoint() {
@@ -450,8 +432,7 @@ public class HexasphereFill : MonoBehaviour {
             isUpdating = true;
             targetFocusPoint = newFocusPoint;
             lastUpdateTime = Time.time;
-            
-            Debug.Log($"🔄 Mise à jour dynamique: Distance = {distanceChange:F3}");
+
             
             // Régénérer immédiatement si autoRegenerate est activé
             if (autoRegenerate) {
@@ -498,8 +479,6 @@ public class HexasphereFill : MonoBehaviour {
         
         // Régénérer la géométrie complète avec le nouveau point de focus
         RegenerateGeometryWithFocus();
-        
-        Debug.Log($"🔄 Mesh régénéré avec focus: {focusPoint}");
     }
     
     void RegenerateGeometryWithFocus() {
@@ -517,7 +496,6 @@ public class HexasphereFill : MonoBehaviour {
     
     void UpdateAutoSubdivision() {
         if (dynamicFocusTarget == null) {
-            Debug.LogWarning("🎯 Aucune cible dynamique assignée - Subdivision automatique désactivée");
             return;
         }
         
@@ -529,10 +507,6 @@ public class HexasphereFill : MonoBehaviour {
         // Calculer le point de focus actuel
         Vector3 targetPosition = dynamicFocusTarget.position;
         Vector3 directionToTarget = (targetPosition - transform.position).normalized;
-        
-        if (showAutoSubdivisionDebug) {
-            Debug.Log($"🎯 Mise à jour subdivision automatique - Cible: {dynamicFocusTarget.name}");
-        }
         
         // Calculer la distance moyenne de tous les triangles
         float averageDistance = 0f;
@@ -548,9 +522,6 @@ public class HexasphereFill : MonoBehaviour {
             averageDistance /= triangleCount;
         }
         
-        if (showAutoSubdivisionDebug) {
-            Debug.Log($"🎯 Distance moyenne: {averageDistance:F3}, Triangles: {triangleCount}");
-        }
         
         // Déterminer le niveau de subdivision basé sur la distance moyenne
         int targetDivisions = divisions;
@@ -558,20 +529,11 @@ public class HexasphereFill : MonoBehaviour {
         if (averageDistance <= autoSubdivisionRadius) {
             // Proche - augmenter les subdivisions
             targetDivisions = Mathf.Min(divisions + 1, maxAutoSubdivisions);
-            if (showAutoSubdivisionDebug) {
-                Debug.Log($"🎯 Proche - Augmenter subdivisions: {targetDivisions}");
-            }
         } else if (averageDistance > reductionRadius && useAutoReduction) {
             // Loin - réduire les subdivisions
             targetDivisions = Mathf.Max(1, divisions - 1);
-            if (showAutoSubdivisionDebug) {
-                Debug.Log($"🎯 Loin - Réduire subdivisions: {targetDivisions}");
-            }
-        } else {
-            if (showAutoSubdivisionDebug) {
-                Debug.Log($"🎯 Zone neutre - Pas de changement: {targetDivisions}");
-            }
         }
+        
         
         // Si le niveau de subdivision a changé et que le changement est significatif, régénérer le mesh
         if (targetDivisions != divisions && Mathf.Abs(averageDistance - lastAverageDistance) > subdivisionThreshold) {
@@ -579,16 +541,12 @@ public class HexasphereFill : MonoBehaviour {
             lastDivisions = divisions;
             lastAverageDistance = averageDistance;
             
-            Debug.Log($"🎯 Changement de subdivision: {divisions} divisions (distance moyenne: {averageDistance:F3})");
-            
             // Mettre à jour le temps de la dernière mise à jour
             lastAutoUpdateTime = Time.time;
             
             // Régénérer la géométrie complète avec le nouveau niveau de subdivision
             RegenerateGeometryWithFocus();
-        } else if (showAutoSubdivisionDebug) {
-            Debug.Log($"🎯 Pas de changement - Divisions: {divisions}, Distance: {averageDistance:F3}, Seuil: {subdivisionThreshold:F3}");
-        }
+        } 
     }
     
     bool IsTriangleInAutoSubdivisionZone(Triangle triangle, Vector3 focusDirection) {
@@ -701,7 +659,34 @@ public class HexasphereFill : MonoBehaviour {
             meshRenderer.material = wireframeMaterial;
         }
         
-        Debug.Log($"🔷 Mesh généré: {vertices.Count} vertices, {triangles.Count/3} triangles");
+        // Ajouter un collider pour la détection (après avoir créé le mesh)
+        MeshCollider collider = GetComponent<MeshCollider>();
+        if (collider == null) {
+            collider = gameObject.AddComponent<MeshCollider>();
+        }
+        collider.sharedMesh = hexagonMesh;
+        collider.convex = false; // Important pour les raycasts
+        
+        // Forcer la mise à jour des bounds du renderer
+        if (meshRenderer != null) {
+            meshRenderer.bounds = hexagonMesh.bounds;
+        }
+    }
+    
+    // Méthode publique pour forcer la mise à jour des bounds
+    public void UpdateRendererBounds() {
+        if (meshRenderer != null && hexagonMesh != null) {
+            meshRenderer.bounds = hexagonMesh.bounds;
+        }
+        
+        // Mettre à jour aussi les bounds des chunks
+        if (meshRendererChunks != null) {
+            for (int i = 0; i < meshRendererChunks.Length; i++) {
+                if (meshRendererChunks[i] != null && meshChunks[i] != null) {
+                    meshRendererChunks[i].bounds = meshChunks[i].bounds;
+                }
+            }
+        }
     }
     
     void GenerateMeshWithChunking() {
@@ -762,8 +747,6 @@ public class HexasphereFill : MonoBehaviour {
         
         // Créer les meshes des chunks
         CreateChunkMeshes();
-        
-        Debug.Log($"🔷 Mesh avec chunking généré: {chunkCount} chunks");
     }
     
     void InitializeChunks() {
@@ -789,12 +772,16 @@ public class HexasphereFill : MonoBehaviour {
                 // Créer le GameObject du chunk
                 GameObject chunkObject = new GameObject($"Hexasphere Chunk {i}");
                 chunkObject.transform.SetParent(transform);
+                chunkObject.transform.localPosition = Vector3.zero; // S'assurer que le chunk est à (0,0,0) par rapport au parent
+                chunkObject.transform.localRotation = Quaternion.identity; // Pas de rotation
+                chunkObject.transform.localScale = Vector3.one; // Échelle normale
+                chunkObject.tag = "Planet"; // Ajouter le tag Planet au chunk
                 
                 // Ajouter les composants
                 meshFilterChunks[i] = chunkObject.AddComponent<MeshFilter>();
                 meshRendererChunks[i] = chunkObject.AddComponent<MeshRenderer>();
                 
-                // Créer le mesh
+                // Créer le mesh d'abord
                 meshChunks[i] = new Mesh();
                 meshChunks[i].name = $"Hexasphere Chunk {i} Mesh";
                 meshChunks[i].vertices = verticesChunks[i].ToArray();
@@ -803,8 +790,19 @@ public class HexasphereFill : MonoBehaviour {
                 meshChunks[i].RecalculateNormals();
                 meshChunks[i].RecalculateBounds();
                 
+                // Debug : vérifier les coordonnées des vertices
+                if (verticesChunks[i].Count > 0) {
+                    Vector3 firstVertex = verticesChunks[i][0];
+                    Debug.Log($"🔷 Chunk {i}: Premier vertex = {firstVertex}, Position chunk = {chunkObject.transform.localPosition}");
+                }
+                
                 // Assigner le mesh
                 meshFilterChunks[i].mesh = meshChunks[i];
+                
+                // Ajouter un collider pour la détection (après avoir créé le mesh)
+                MeshCollider collider = chunkObject.AddComponent<MeshCollider>();
+                collider.sharedMesh = meshChunks[i];
+                collider.convex = false; // Important pour les raycasts
                 
                 // Configurer le matériau
                 if (hexagonMaterial == null) {
@@ -814,8 +812,6 @@ public class HexasphereFill : MonoBehaviour {
                 meshRendererChunks[i].material = hexagonMaterial;
                 
                 chunkCount++;
-                
-                Debug.Log($"⚡ Chunk {i} créé: {verticesChunks[i].Count} vertices, {trianglesChunks[i].Count/3} triangles");
             }
         }
     }
@@ -874,8 +870,6 @@ public class HexasphereFill : MonoBehaviour {
                 }
             }
         }
-        
-        Debug.Log("🧹 Anciens chunks nettoyés");
     }
     
     Point GetCachedPoint(Point point) {
@@ -991,7 +985,6 @@ public class HexasphereFill : MonoBehaviour {
                 Vector3 directionToTarget = (targetPosition - transform.position).normalized;
                 focusPoint = directionToTarget;
                 RegenerateMeshWithNewFocus();
-                Debug.Log($"🔄 Focus forcé: {focusPoint}");
             }
         }
         
@@ -1024,7 +1017,6 @@ public class HexasphereFill : MonoBehaviour {
         
         if (useAutoSubdivision && GUILayout.Button("🎯 Activate Auto Debug")) {
             showAutoSubdivisionDebug = true;
-            Debug.Log("🎯 Debug automatique activé");
         }
         
         if (useAutoSubdivision && GUILayout.Button("🎯 Force Auto Update")) {
