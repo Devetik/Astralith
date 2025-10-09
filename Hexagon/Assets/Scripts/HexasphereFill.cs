@@ -16,6 +16,39 @@ public class HexasphereFill : MonoBehaviour {
     [SerializeField] public bool fixTriangleOrientation = true;
     [SerializeField] public bool useSphericalUVs = true;
     
+    [Header("🌍 Génération Procédurale de Planète")]
+    [SerializeField] public bool useProceduralGeneration = true;
+    [SerializeField] public float noiseScale = 1f;
+    [SerializeField] public float heightAmplitude = 0.2f;
+    [SerializeField] public bool useAdvancedNoise = true;
+    [SerializeField] public float baseNoiseScale = 1f;
+    [SerializeField] public int baseOctaves = 4;
+    [SerializeField] public float basePersistence = 0.5f;
+    [SerializeField] public float baseLacunarity = 2f;
+    [SerializeField] public float detailNoiseScale = 2f;
+    [SerializeField] public int detailOctaves = 3;
+    [SerializeField] public float detailPersistence = 0.3f;
+    [SerializeField] public float detailLacunarity = 2f;
+    [SerializeField] public bool useRidgeNoise = true;
+    [SerializeField] public float ridgeNoiseScale = 0.5f;
+    [SerializeField] public float ridgeIntensity = 0.3f;
+    
+    [Header("🌊 Niveaux de Terrain")]
+    [SerializeField] public float waterLevel = 0.0f;
+    [SerializeField] public float mountainLevel = 0.3f;
+    [SerializeField] public bool useFlatOceans = true;
+    [SerializeField] public bool forceOceanLevel = true;
+    
+    [Header("🌊 Système Océans Avancé")]
+    [SerializeField] public bool useAdvancedOceanSystem = true;
+    [SerializeField] public bool preserveBaseShape = true;
+    [SerializeField] public float oceanFlatteningStrength = 1f;
+    
+    [Header("🎨 Matériaux de Planète")]
+    [SerializeField] public Material waterMaterial;
+    [SerializeField] public Material landMaterial;
+    [SerializeField] public Material mountainMaterial;
+    
     [Header("⚡ Performance")]
     [SerializeField] public bool useChunking = false;
     [SerializeField] public int maxVerticesPerChunk = 65000;
@@ -633,30 +666,35 @@ public class HexasphereFill : MonoBehaviour {
             }
         }
         
-        // Créer le mesh
-        hexagonMesh = new Mesh();
-        hexagonMesh.name = "Hexasphere Mesh";
-        hexagonMesh.vertices = vertices.ToArray();
-        hexagonMesh.triangles = triangles.ToArray();
-        hexagonMesh.uv = uvs.ToArray();
-        hexagonMesh.RecalculateNormals();
-        hexagonMesh.RecalculateBounds();
-        
-        // Assigner le mesh
-        meshFilter.mesh = hexagonMesh;
-        
-        // Configurer le matériau
-        if (hexagonMaterial == null) {
-            hexagonMaterial = new Material(Shader.Find("Standard"));
-            hexagonMaterial.color = hexagonColor;
-        }
-        meshRenderer.material = hexagonMaterial;
-        
-        // Configurer le wireframe si demandé
-        if (showWireframe) {
-            Material wireframeMaterial = new Material(Shader.Find("Unlit/Color"));
-            wireframeMaterial.color = Color.white;
-            meshRenderer.material = wireframeMaterial;
+        // Appliquer la génération procédurale si activée
+        if (useProceduralGeneration) {
+            ApplyProceduralGeneration(vertices, uvs, triangles);
+        } else {
+            // Créer le mesh simple
+            hexagonMesh = new Mesh();
+            hexagonMesh.name = "Hexasphere Mesh";
+            hexagonMesh.vertices = vertices.ToArray();
+            hexagonMesh.triangles = triangles.ToArray();
+            hexagonMesh.uv = uvs.ToArray();
+            hexagonMesh.RecalculateNormals();
+            hexagonMesh.RecalculateBounds();
+            
+            // Assigner le mesh
+            meshFilter.mesh = hexagonMesh;
+            
+            // Configurer le matériau
+            if (hexagonMaterial == null) {
+                hexagonMaterial = new Material(Shader.Find("Standard"));
+                hexagonMaterial.color = hexagonColor;
+            }
+            meshRenderer.material = hexagonMaterial;
+            
+            // Configurer le wireframe si demandé
+            if (showWireframe) {
+                Material wireframeMaterial = new Material(Shader.Find("Unlit/Color"));
+                wireframeMaterial.color = Color.white;
+                meshRenderer.material = wireframeMaterial;
+            }
         }
         
         // Ajouter un collider pour la détection (après avoir créé le mesh)
@@ -745,6 +783,11 @@ public class HexasphereFill : MonoBehaviour {
             }
         }
         
+        // Appliquer la génération procédurale si activée
+        if (useProceduralGeneration) {
+            ApplyProceduralGenerationToChunks();
+        }
+        
         // Créer les meshes des chunks
         CreateChunkMeshes();
     }
@@ -790,21 +833,25 @@ public class HexasphereFill : MonoBehaviour {
                 meshChunks[i].RecalculateNormals();
                 meshChunks[i].RecalculateBounds();
                 
-                
-                // Assigner le mesh
-                meshFilterChunks[i].mesh = meshChunks[i];
+                // Appliquer la génération procédurale aux chunks si activée
+                if (useProceduralGeneration) {
+                    CreateProceduralChunkMesh(i);
+                } else {
+                    // Assigner le mesh simple
+                    meshFilterChunks[i].mesh = meshChunks[i];
+                    
+                    // Configurer le matériau simple
+                    if (hexagonMaterial == null) {
+                        hexagonMaterial = new Material(Shader.Find("Standard"));
+                        hexagonMaterial.color = hexagonColor;
+                    }
+                    meshRendererChunks[i].material = hexagonMaterial;
+                }
                 
                 // Ajouter un collider pour la détection (après avoir créé le mesh)
                 MeshCollider collider = chunkObject.AddComponent<MeshCollider>();
                 collider.sharedMesh = meshChunks[i];
                 collider.convex = false; // Important pour les raycasts
-                
-                // Configurer le matériau
-                if (hexagonMaterial == null) {
-                    hexagonMaterial = new Material(Shader.Find("Standard"));
-                    hexagonMaterial.color = hexagonColor;
-                }
-                meshRendererChunks[i].material = hexagonMaterial;
                 
                 chunkCount++;
             }
@@ -931,6 +978,377 @@ public class HexasphereFill : MonoBehaviour {
             }
             triangleCount++;
         }
+    }
+    
+    // === GÉNÉRATION PROCÉDURALE DE PLANÈTE ===
+    
+    float GenerateHeight(Vector3 position) {
+        if (useAdvancedNoise) {
+            return GenerateAdvancedHeight(position);
+        } else {
+            return GeneratePerlinHeight(position);
+        }
+    }
+    
+    float GeneratePerlinHeight(Vector3 position) {
+        // Utiliser les coordonnées sphériques pour un bruit plus naturel
+        float latitude = Mathf.Asin(position.y);
+        float longitude = Mathf.Atan2(position.z, position.x);
+        
+        // Convertir en coordonnées UV pour le bruit
+        float u = (longitude + Mathf.PI) / (2f * Mathf.PI);
+        float v = (latitude + Mathf.PI / 2f) / Mathf.PI;
+        
+        // Générer plusieurs octaves de bruit
+        float height = 0f;
+        float frequency = 1f;
+        float amplitude = heightAmplitude;
+        float maxValue = 0f;
+
+        for (int i = 0; i < 6; i++) {
+            float noiseValue = Mathf.PerlinNoise(
+                u * noiseScale * frequency,
+                v * noiseScale * frequency
+            );
+            height += noiseValue * amplitude;
+            maxValue += amplitude;
+            frequency *= 2f;
+            amplitude *= 0.5f;
+        }
+
+        // Normaliser le résultat
+        if (maxValue > 0) {
+            height = height / maxValue;
+        }
+
+        return height;
+    }
+    
+    float GenerateAdvancedHeight(Vector3 position) {
+        // Coordonnées sphériques
+        float latitude = Mathf.Asin(position.y);
+        float longitude = Mathf.Atan2(position.z, position.x);
+        
+        // Convertir en coordonnées UV
+        float u = (longitude + Mathf.PI) / (2f * Mathf.PI);
+        float v = (latitude + Mathf.PI / 2f) / Mathf.PI;
+        
+        // Bruit de base (grandes structures)
+        float baseHeight = GenerateFractalNoise(u, v, baseNoiseScale, baseOctaves, basePersistence, baseLacunarity);
+        
+        // Bruit de détail (petites structures)
+        float detailHeight = GenerateFractalNoise(u, v, detailNoiseScale, detailOctaves, detailPersistence, detailLacunarity);
+        
+        // Bruit de ridges (montagnes)
+        float ridgeHeight = 0f;
+        if (useRidgeNoise) {
+            ridgeHeight = GenerateRidgeNoise(u, v, ridgeNoiseScale) * ridgeIntensity;
+        }
+        
+        // Combiner les bruits
+        float totalHeight = (baseHeight + detailHeight * 0.3f + ridgeHeight) * heightAmplitude;
+        
+        return totalHeight;
+    }
+    
+    float GenerateFractalNoise(float u, float v, float scale, int octaves, float persistence, float lacunarity) {
+        float height = 0f;
+        float frequency = 1f;
+        float amplitude = 1f;
+        float maxValue = 0f;
+        
+        for (int i = 0; i < octaves; i++) {
+            float noiseValue = Mathf.PerlinNoise(u * scale * frequency, v * scale * frequency);
+            height += noiseValue * amplitude;
+            maxValue += amplitude;
+            frequency *= lacunarity;
+            amplitude *= persistence;
+        }
+        
+        if (maxValue > 0) {
+            height = height / maxValue;
+        }
+        
+        return height;
+    }
+    
+    float GenerateRidgeNoise(float u, float v, float scale) {
+        float noise1 = Mathf.PerlinNoise(u * scale, v * scale);
+        float noise2 = Mathf.PerlinNoise(u * scale * 2f, v * scale * 2f);
+        
+        // Créer des ridges en utilisant la valeur absolue
+        float ridge = Mathf.Abs(noise1 - 0.5f) * 2f;
+        ridge = 1f - ridge;
+        ridge = ridge * ridge;
+        
+        return ridge;
+    }
+    
+    void ApplyProceduralGeneration(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
+        if (!useProceduralGeneration) return;
+        
+        // Appliquer les hauteurs procédurales
+        for (int i = 0; i < vertices.Count; i++) {
+            Vector3 originalVertex = vertices[i];
+            Vector3 normalizedVertex = originalVertex.normalized;
+            
+            float height = GenerateHeight(normalizedVertex);
+            
+            // Nouveau système d'océans qui préserve la forme de base
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                if (useFlatOceans && height <= waterLevel) {
+                    height = 0f; // Océans plats au niveau 0
+                } else if (height > waterLevel) {
+                    if (forceOceanLevel) {
+                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Appliquer la hauteur au vertex
+            vertices[i] = normalizedVertex * (radius + height);
+        }
+        
+        // Créer le mesh avec multi-matériaux
+        CreateProceduralMesh(vertices, uvs, triangles);
+    }
+    
+    void ApplyProceduralGenerationToChunks() {
+        if (!useProceduralGeneration) return;
+        
+        // Appliquer la génération procédurale à tous les chunks
+        for (int chunkIndex = 0; chunkIndex < maxChunks; chunkIndex++) {
+            if (verticesChunks[chunkIndex].Count > 0) {
+                // Appliquer les hauteurs procédurales
+                for (int i = 0; i < verticesChunks[chunkIndex].Count; i++) {
+                    Vector3 originalVertex = verticesChunks[chunkIndex][i];
+                    Vector3 normalizedVertex = originalVertex.normalized;
+                    
+                    float height = GenerateHeight(normalizedVertex);
+                    
+                    // Nouveau système d'océans qui préserve la forme de base
+                    if (useAdvancedOceanSystem && preserveBaseShape) {
+                        height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+                    } else {
+                        // Ancien système (pour compatibilité)
+                        if (useFlatOceans && height <= waterLevel) {
+                            height = 0f; // Océans plats au niveau 0
+                        } else if (height > waterLevel) {
+                            if (forceOceanLevel) {
+                                height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                            }
+                        }
+                    }
+                    
+                    // Appliquer la hauteur au vertex
+                    verticesChunks[chunkIndex][i] = normalizedVertex * (radius + height);
+                }
+            }
+        }
+    }
+    
+    void CreateProceduralMesh(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles) {
+        // Séparer les triangles par type de terrain
+        List<int> waterTriangles = new List<int>();
+        List<int> landTriangles = new List<int>();
+        List<int> mountainTriangles = new List<int>();
+        
+        for (int i = 0; i < triangles.Count; i += 3) {
+            int p1 = triangles[i];
+            int p2 = triangles[i + 1];
+            int p3 = triangles[i + 2];
+            
+            // Calculer l'altitude moyenne du triangle
+            float avgHeight = (GetVertexHeight(vertices[p1]) + GetVertexHeight(vertices[p2]) + GetVertexHeight(vertices[p3])) / 3f;
+            
+            // Assigner au bon type de terrain
+            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+                waterTriangles.Add(p1);
+                waterTriangles.Add(p2);
+                waterTriangles.Add(p3);
+            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+                landTriangles.Add(p1);
+                landTriangles.Add(p2);
+                landTriangles.Add(p3);
+            } else {
+                mountainTriangles.Add(p1);
+                mountainTriangles.Add(p2);
+                mountainTriangles.Add(p3);
+            }
+        }
+        
+        // Créer le mesh avec submeshes
+        Mesh mesh = new Mesh();
+        mesh.name = "HexasphereFill Planet";
+        mesh.vertices = vertices.ToArray();
+        mesh.uv = uvs.ToArray();
+        
+        // Créer les submeshes
+        mesh.subMeshCount = 3;
+        mesh.SetTriangles(waterTriangles.ToArray(), 0);
+        mesh.SetTriangles(landTriangles.ToArray(), 1);
+        mesh.SetTriangles(mountainTriangles.ToArray(), 2);
+        
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        
+        // Appliquer le mesh
+        if (meshFilter != null) {
+            meshFilter.mesh = mesh;
+        }
+        
+        // Appliquer les matériaux
+        ApplyPlanetMaterials();
+    }
+    
+    float GetVertexHeight(Vector3 vertex) {
+        Vector3 normalizedVertex = vertex.normalized;
+        float height = GenerateHeight(normalizedVertex);
+        
+        // Appliquer le système d'océans avancé si activé
+        if (useAdvancedOceanSystem && preserveBaseShape) {
+            height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+        } else {
+            // Ancien système (pour compatibilité)
+            if (useFlatOceans && height <= waterLevel) {
+                height = 0f; // Océans plats au niveau 0
+            } else if (height > waterLevel) {
+                if (forceOceanLevel) {
+                    height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                }
+            }
+        }
+        
+        return height;
+    }
+    
+    void ApplyPlanetMaterials() {
+        if (meshRenderer == null) return;
+        
+        // Créer des matériaux par défaut si aucun n'est assigné
+        if (waterMaterial == null) {
+            waterMaterial = CreateDefaultMaterial(Color.blue, "Water");
+        }
+        if (landMaterial == null) {
+            landMaterial = CreateDefaultMaterial(Color.green, "Land");
+        }
+        if (mountainMaterial == null) {
+            mountainMaterial = CreateDefaultMaterial(Color.gray, "Mountain");
+        }
+        
+        // Assigner les matériaux
+        Material[] materials = { waterMaterial, landMaterial, mountainMaterial };
+        meshRenderer.materials = materials;
+    }
+    
+    Material CreateDefaultMaterial(Color color, string name) {
+        Material mat = new Material(Shader.Find("Standard"));
+        mat.name = name;
+        mat.color = color;
+        mat.SetFloat("_Metallic", 0f);
+        mat.SetFloat("_Smoothness", 0.5f);
+        return mat;
+    }
+    
+    // === SYSTÈME OCÉANS AVANCÉ ===
+    
+    float ApplyAdvancedOceanSystem(Vector3 vertex, float originalHeight) {
+        // Préserver la forme de base : ne pas modifier la hauteur globale
+        // Seulement aplatir les zones qui devraient être submergées
+        
+        if (originalHeight <= waterLevel) {
+            // Zone qui devrait être submergée
+            // Au lieu de mettre à 0, on aplatit progressivement vers le niveau de l'eau
+            float flatteningFactor = Mathf.Clamp01((waterLevel - originalHeight) / waterLevel);
+            float flattenedHeight = Mathf.Lerp(originalHeight, waterLevel, flatteningFactor * oceanFlatteningStrength);
+            
+            // Pour les océans plats, on peut encore les aplatir complètement si souhaité
+            if (useFlatOceans) {
+                return waterLevel; // Niveau constant pour les océans
+            } else {
+                return flattenedHeight; // Aplatissement progressif
+            }
+        } else {
+            // Zone terrestre : garder la hauteur originale
+            // Pas de modification de la forme de base
+            return originalHeight;
+        }
+    }
+    
+    void CreateProceduralChunkMesh(int chunkIndex) {
+        // Séparer les triangles par type de terrain pour ce chunk
+        List<int> waterTriangles = new List<int>();
+        List<int> landTriangles = new List<int>();
+        List<int> mountainTriangles = new List<int>();
+        
+        for (int i = 0; i < trianglesChunks[chunkIndex].Count; i += 3) {
+            int p1 = trianglesChunks[chunkIndex][i];
+            int p2 = trianglesChunks[chunkIndex][i + 1];
+            int p3 = trianglesChunks[chunkIndex][i + 2];
+            
+            // Calculer l'altitude moyenne du triangle
+            float avgHeight = (GetVertexHeight(verticesChunks[chunkIndex][p1]) + 
+                              GetVertexHeight(verticesChunks[chunkIndex][p2]) + 
+                              GetVertexHeight(verticesChunks[chunkIndex][p3])) / 3f;
+            
+            // Assigner au bon type de terrain
+            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+                waterTriangles.Add(p1);
+                waterTriangles.Add(p2);
+                waterTriangles.Add(p3);
+            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+                landTriangles.Add(p1);
+                landTriangles.Add(p2);
+                landTriangles.Add(p3);
+            } else {
+                mountainTriangles.Add(p1);
+                mountainTriangles.Add(p2);
+                mountainTriangles.Add(p3);
+            }
+        }
+        
+        // Créer le mesh avec submeshes
+        Mesh chunkMesh = new Mesh();
+        chunkMesh.name = $"HexasphereFill Chunk {chunkIndex} Planet";
+        chunkMesh.vertices = verticesChunks[chunkIndex].ToArray();
+        chunkMesh.uv = uvsChunks[chunkIndex].ToArray();
+        
+        // Créer les submeshes
+        chunkMesh.subMeshCount = 3;
+        chunkMesh.SetTriangles(waterTriangles.ToArray(), 0);
+        chunkMesh.SetTriangles(landTriangles.ToArray(), 1);
+        chunkMesh.SetTriangles(mountainTriangles.ToArray(), 2);
+        
+        chunkMesh.RecalculateNormals();
+        chunkMesh.RecalculateBounds();
+        
+        // Appliquer le mesh
+        meshFilterChunks[chunkIndex].mesh = chunkMesh;
+        
+        // Appliquer les matériaux de planète
+        ApplyPlanetMaterialsToChunk(chunkIndex);
+    }
+    
+    void ApplyPlanetMaterialsToChunk(int chunkIndex) {
+        if (meshRendererChunks[chunkIndex] == null) return;
+        
+        // Créer des matériaux par défaut si aucun n'est assigné
+        if (waterMaterial == null) {
+            waterMaterial = CreateDefaultMaterial(Color.blue, "Water");
+        }
+        if (landMaterial == null) {
+            landMaterial = CreateDefaultMaterial(Color.green, "Land");
+        }
+        if (mountainMaterial == null) {
+            mountainMaterial = CreateDefaultMaterial(Color.gray, "Mountain");
+        }
+        
+        // Assigner les matériaux
+        Material[] materials = { waterMaterial, landMaterial, mountainMaterial };
+        meshRendererChunks[chunkIndex].materials = materials;
     }
 }
 
