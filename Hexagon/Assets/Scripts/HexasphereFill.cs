@@ -24,9 +24,19 @@ public class HexasphereFill : MonoBehaviour {
     
     [Header("🔍 Subdivision par Frontières de Matériaux")]
     [SerializeField] public bool useMaterialBoundarySubdivision = true; // Subdivision des triangles frontières
+    [SerializeField] public bool applyToEntirePlanet = true; // Appliquer à toute la planète (pas seulement le focus)
     [SerializeField] public bool showBoundaryDebug = false; // Afficher les triangles frontières
     [SerializeField] public Color boundaryTriangleColor = Color.yellow; // Couleur des triangles frontières
     [SerializeField] public float boundaryDetectionThreshold = 0.1f; // Seuil de détection des frontières
+    [SerializeField] public int maxBoundarySubdivisions = 2; // Nombre de subdivisions supplémentaires pour les frontières
+    [SerializeField] public bool showSubdivisionInfo = true; // Afficher les informations de subdivision
+    [SerializeField] public bool useOptimizedNeighborDetection = true; // Utiliser la détection optimisée des voisins
+    [SerializeField] public bool useSubdivisionLevelDetection = true; // Utiliser la détection basée sur le niveau de subdivision
+    [SerializeField] public float complexityThreshold = 0.1f; // Seuil de complexité pour déterminer si un triangle doit être subdivisé
+    [SerializeField] public float altitudeWeight = 0.4f; // Poids de la variation d'altitude
+    [SerializeField] public float terrainWeight = 0.3f; // Poids de la variation de terrain
+    [SerializeField] public float sizeWeight = 0.2f; // Poids de la taille du triangle
+    [SerializeField] public float boundaryWeight = 0.1f; // Poids de la proximité aux frontières
 
     [Header("🔷 Hexasphere Settings")]
     [SerializeField] public int divisions = 3;
@@ -264,6 +274,11 @@ public class HexasphereFill : MonoBehaviour {
         } else {
             GenerateMeshSingle();
         }
+        
+        // Afficher les informations de subdivision
+        if (showSubdivisionInfo) {
+            DisplaySubdivisionInfo();
+        }
     }
     
     void CreateIcosahedron() {
@@ -410,7 +425,7 @@ public class HexasphereFill : MonoBehaviour {
     // === MÉTHODES POUR LA SUBDIVISION PAR FRONTIÈRES DE MATÉRIAUX ===
     
     void ApplyMaterialBoundarySubdivision() {
-        // Détecter les triangles frontières dans la zone de focus
+        // Détecter les triangles frontières (dans le focus ou sur toute la planète)
         DetectBoundaryTriangles();
         
         // Subdiviser les triangles frontières détectés
@@ -423,7 +438,10 @@ public class HexasphereFill : MonoBehaviour {
         
         // D'abord, déterminer le type de terrain pour chaque triangle
         foreach (var triangle in triangles) {
-            if (IsTriangleInFocus(triangle)) {
+            // Analyser tous les triangles si applyToEntirePlanet est activé, sinon seulement ceux en focus
+            bool shouldAnalyze = applyToEntirePlanet || IsTriangleInFocus(triangle);
+            
+            if (shouldAnalyze) {
                 TerrainType terrainType = DetermineTriangleTerrainType(triangle);
                 triangleTerrainTypes[triangle] = terrainType;
             }
@@ -431,13 +449,16 @@ public class HexasphereFill : MonoBehaviour {
         
         // Ensuite, détecter les triangles frontières
         foreach (var triangle in triangles) {
-            if (IsTriangleInFocus(triangle) && IsTriangleOnBoundary(triangle)) {
+            bool shouldCheck = applyToEntirePlanet || IsTriangleInFocus(triangle);
+            
+            if (shouldCheck && IsTriangleOnBoundary(triangle)) {
                 boundaryTriangles.Add(triangle);
             }
         }
         
         if (showBoundaryDebug) {
-            Debug.Log($"🔍 {boundaryTriangles.Count} triangles frontières détectés dans la zone de focus");
+            string scope = applyToEntirePlanet ? "sur toute la planète" : "dans la zone de focus";
+            Debug.Log($"🔍 {boundaryTriangles.Count} triangles frontières détectés {scope}");
         }
     }
     
@@ -464,10 +485,18 @@ public class HexasphereFill : MonoBehaviour {
             return false;
         }
         
+        // Utiliser la nouvelle méthode de détection basée sur le niveau de subdivision
+        if (useSubdivisionLevelDetection) {
+            return ShouldTriangleBeSubdivided(triangle);
+        }
+        
+        // Ancienne méthode : vérifier les voisins
         TerrainType triangleType = triangleTerrainTypes[triangle];
         
         // Vérifier si le triangle a des voisins avec des types de terrain différents
-        List<Triangle> neighbors = FindTriangleNeighbors(triangle);
+        List<Triangle> neighbors = useOptimizedNeighborDetection ? 
+            FindTriangleNeighborsOptimized(triangle) : 
+            FindTriangleNeighbors(triangle);
         
         foreach (var neighbor in neighbors) {
             if (triangleTerrainTypes.ContainsKey(neighbor)) {
@@ -508,34 +537,259 @@ public class HexasphereFill : MonoBehaviour {
         return neighbors;
     }
     
-    void SubdivideBoundaryTriangles() {
-        List<Triangle> newTriangles = new List<Triangle>();
+    // Méthode optimisée pour trouver les voisins d'un triangle
+    List<Triangle> FindTriangleNeighborsOptimized(Triangle triangle) {
+        List<Triangle> neighbors = new List<Triangle>();
         
-        foreach (var triangle in triangles) {
-            if (boundaryTriangles.Contains(triangle)) {
-                // Subdiviser le triangle frontière
-                Point mid1 = GetCachedPoint(Point.Midpoint(triangle.points[0], triangle.points[1]).Normalized);
-                Point mid2 = GetCachedPoint(Point.Midpoint(triangle.points[1], triangle.points[2]).Normalized);
-                Point mid3 = GetCachedPoint(Point.Midpoint(triangle.points[2], triangle.points[0]).Normalized);
-                
-                newTriangles.Add(new Triangle(triangle.points[0], mid1, mid3));
-                newTriangles.Add(new Triangle(triangle.points[1], mid2, mid1));
-                newTriangles.Add(new Triangle(triangle.points[2], mid3, mid2));
-                newTriangles.Add(new Triangle(mid1, mid2, mid3));
-                
-                if (showBoundaryDebug) {
-                    Debug.Log($"🔧 Triangle frontière subdivisé");
+        // Créer un set des points du triangle pour une recherche plus rapide
+        HashSet<Point> trianglePoints = new HashSet<Point>(triangle.points);
+        
+        // Trouver les triangles qui partagent au moins 2 points
+        foreach (var otherTriangle in triangles) {
+            if (otherTriangle == triangle) continue;
+            
+            int sharedPoints = 0;
+            foreach (var point in otherTriangle.points) {
+                if (trianglePoints.Contains(point)) {
+                    sharedPoints++;
+                    if (sharedPoints >= 2) {
+                        neighbors.Add(otherTriangle);
+                        break;
+                    }
                 }
-            } else {
-                // Garder le triangle tel quel
-                newTriangles.Add(triangle);
             }
         }
         
-        triangles = newTriangles;
+        return neighbors;
+    }
+    
+    // === NOUVELLE MÉTHODE DE DÉTECTION BASÉE SUR LE NIVEAU DE SUBDIVISION ===
+    
+    bool ShouldTriangleBeSubdivided(Triangle triangle) {
+        // Analyser la complexité du triangle pour déterminer s'il devrait être subdivisé
+        float complexity = CalculateTriangleComplexity(triangle);
+        
+        // Vérifier si le triangle est dans une zone qui nécessite plus de subdivision
+        bool needsMoreSubdivision = complexity > complexityThreshold;
+        
+        if (showBoundaryDebug && needsMoreSubdivision) {
+            Debug.Log($"🔍 Triangle complexe détecté (complexité: {complexity:F3})");
+        }
+        
+        return needsMoreSubdivision;
+    }
+    
+    float CalculateTriangleComplexity(Triangle triangle) {
+        // Calculer la complexité du triangle basée sur plusieurs facteurs
+        
+        // 1. Variation d'altitude dans le triangle
+        float altitudeVariation = CalculateAltitudeVariation(triangle);
+        
+        // 2. Variation de type de terrain dans le triangle
+        float terrainVariation = CalculateTerrainVariation(triangle);
+        
+        // 3. Taille du triangle (plus petit = plus complexe)
+        float sizeComplexity = CalculateSizeComplexity(triangle);
+        
+        // 4. Proximité aux frontières de matériaux
+        float boundaryProximity = CalculateBoundaryProximity(triangle);
+        
+        // Normaliser les poids pour qu'ils totalisent 1.0
+        float totalWeight = altitudeWeight + terrainWeight + sizeWeight + boundaryWeight;
+        float normalizedAltitudeWeight = altitudeWeight / totalWeight;
+        float normalizedTerrainWeight = terrainWeight / totalWeight;
+        float normalizedSizeWeight = sizeWeight / totalWeight;
+        float normalizedBoundaryWeight = boundaryWeight / totalWeight;
+        
+        // Combiner les facteurs avec des poids configurables
+        float totalComplexity = 
+            altitudeVariation * normalizedAltitudeWeight +
+            terrainVariation * normalizedTerrainWeight +
+            sizeComplexity * normalizedSizeWeight +
+            boundaryProximity * normalizedBoundaryWeight;
         
         if (showBoundaryDebug) {
-            Debug.Log($"✅ {boundaryTriangles.Count} triangles frontières subdivisés");
+            Debug.Log($"🔍 Complexité triangle: Alt={altitudeVariation:F3}*{normalizedAltitudeWeight:F2} + " +
+                     $"Ter={terrainVariation:F3}*{normalizedTerrainWeight:F2} + " +
+                     $"Size={sizeComplexity:F3}*{normalizedSizeWeight:F2} + " +
+                     $"Bound={boundaryProximity:F3}*{normalizedBoundaryWeight:F2} = {totalComplexity:F3}");
+        }
+        
+        return totalComplexity;
+    }
+    
+    float CalculateAltitudeVariation(Triangle triangle) {
+        // Calculer la variation d'altitude entre les points du triangle
+        Vector3 v1 = triangle.points[0].ToVector3() * radius;
+        Vector3 v2 = triangle.points[1].ToVector3() * radius;
+        Vector3 v3 = triangle.points[2].ToVector3() * radius;
+        
+        float h1 = GetVertexHeight(v1);
+        float h2 = GetVertexHeight(v2);
+        float h3 = GetVertexHeight(v3);
+        
+        // Calculer la variance des hauteurs
+        float avgHeight = (h1 + h2 + h3) / 3f;
+        float variance = Mathf.Pow(h1 - avgHeight, 2) + Mathf.Pow(h2 - avgHeight, 2) + Mathf.Pow(h3 - avgHeight, 2);
+        variance /= 3f;
+        
+        return Mathf.Sqrt(variance);
+    }
+    
+    float CalculateTerrainVariation(Triangle triangle) {
+        // Calculer la variation de type de terrain dans le triangle
+        Vector3 v1 = triangle.points[0].ToVector3() * radius;
+        Vector3 v2 = triangle.points[1].ToVector3() * radius;
+        Vector3 v3 = triangle.points[2].ToVector3() * radius;
+        
+        TerrainType t1 = GetTerrainTypeForVertex(v1);
+        TerrainType t2 = GetTerrainTypeForVertex(v2);
+        TerrainType t3 = GetTerrainTypeForVertex(v3);
+        
+        // Compter les types différents
+        int differentTypes = 0;
+        if (t1 != t2) differentTypes++;
+        if (t2 != t3) differentTypes++;
+        if (t1 != t3) differentTypes++;
+        
+        return differentTypes / 3f; // Normaliser entre 0 et 1
+    }
+    
+    float CalculateSizeComplexity(Triangle triangle) {
+        // Calculer la complexité basée sur la taille du triangle
+        Vector3 v1 = triangle.points[0].ToVector3();
+        Vector3 v2 = triangle.points[1].ToVector3();
+        Vector3 v3 = triangle.points[2].ToVector3();
+        
+        // Calculer l'aire du triangle
+        float area = Vector3.Cross(v2 - v1, v3 - v1).magnitude / 2f;
+        
+        // Plus l'aire est grande, plus le triangle devrait être subdivisé
+        return Mathf.Clamp01(area * 10f); // Normaliser
+    }
+    
+    float CalculateBoundaryProximity(Triangle triangle) {
+        // Calculer la proximité aux frontières de matériaux
+        Vector3 center = (triangle.points[0].ToVector3() + triangle.points[1].ToVector3() + triangle.points[2].ToVector3()) / 3f;
+        
+        // Chercher des triangles voisins avec des types différents
+        List<Triangle> neighbors = useOptimizedNeighborDetection ? 
+            FindTriangleNeighborsOptimized(triangle) : 
+            FindTriangleNeighbors(triangle);
+        
+        int differentNeighbors = 0;
+        TerrainType triangleType = triangleTerrainTypes[triangle];
+        
+        foreach (var neighbor in neighbors) {
+            if (triangleTerrainTypes.ContainsKey(neighbor)) {
+                TerrainType neighborType = triangleTerrainTypes[neighbor];
+                if (neighborType != triangleType) {
+                    differentNeighbors++;
+                }
+            }
+        }
+        
+        return Mathf.Clamp01(differentNeighbors / 3f); // Normaliser
+    }
+    
+    TerrainType GetTerrainTypeForVertex(Vector3 vertex) {
+        // Déterminer le type de terrain pour un vertex
+        float height = GetVertexHeight(vertex);
+        
+        if (height <= waterLevel) {
+            return TerrainType.Water;
+        } else if (height <= mountainLevel) {
+            return TerrainType.Land;
+        } else {
+            return TerrainType.Mountain;
+        }
+    }
+    
+    void SubdivideBoundaryTriangles() {
+        if (maxBoundarySubdivisions <= 0) {
+            if (showBoundaryDebug) {
+                Debug.Log("⚠️ Aucune subdivision supplémentaire demandée pour les frontières");
+            }
+            return;
+        }
+        
+        int actualSubdivisions = 0;
+        
+        // Appliquer les subdivisions supplémentaires pour les triangles frontières
+        for (int subdivisionLevel = 0; subdivisionLevel < maxBoundarySubdivisions; subdivisionLevel++) {
+            List<Triangle> newTriangles = new List<Triangle>();
+            List<Triangle> newBoundaryTriangles = new List<Triangle>();
+            
+            // Re-détecter les triangles frontières à chaque niveau
+            DetectBoundaryTriangles();
+            
+            if (boundaryTriangles.Count == 0) {
+                if (showBoundaryDebug) {
+                    Debug.Log($"✅ Plus de triangles frontières détectés, arrêt à la subdivision {subdivisionLevel}");
+                }
+                break;
+            }
+            
+            foreach (var triangle in triangles) {
+                if (boundaryTriangles.Contains(triangle)) {
+                    // Subdiviser le triangle frontière
+                    Point mid1 = GetCachedPoint(Point.Midpoint(triangle.points[0], triangle.points[1]).Normalized);
+                    Point mid2 = GetCachedPoint(Point.Midpoint(triangle.points[1], triangle.points[2]).Normalized);
+                    Point mid3 = GetCachedPoint(Point.Midpoint(triangle.points[2], triangle.points[0]).Normalized);
+                    
+                    Triangle sub1 = new Triangle(triangle.points[0], mid1, mid3);
+                    Triangle sub2 = new Triangle(triangle.points[1], mid2, mid1);
+                    Triangle sub3 = new Triangle(triangle.points[2], mid3, mid2);
+                    Triangle sub4 = new Triangle(mid1, mid2, mid3);
+                    
+                    newTriangles.Add(sub1);
+                    newTriangles.Add(sub2);
+                    newTriangles.Add(sub3);
+                    newTriangles.Add(sub4);
+                    
+                    if (showBoundaryDebug) {
+                        Debug.Log($"🔧 Triangle frontière subdivisé (niveau {subdivisionLevel + 1})");
+                    }
+                } else {
+                    // Garder le triangle tel quel
+                    newTriangles.Add(triangle);
+                }
+            }
+            
+            triangles = newTriangles;
+            actualSubdivisions++;
+            
+            if (showBoundaryDebug) {
+                Debug.Log($"📊 Niveau {subdivisionLevel + 1} terminé - {triangles.Count} triangles, {boundaryTriangles.Count} frontières restantes");
+            }
+        }
+        
+        if (showBoundaryDebug) {
+            int totalSubdivisions = backgroundDivisions + focusDivisions + actualSubdivisions;
+            Debug.Log($"✅ Subdivision des frontières terminée - {triangles.Count} triangles finaux");
+            Debug.Log($"📊 Subdivisions appliquées: {actualSubdivisions}/{maxBoundarySubdivisions} niveaux de frontières");
+            Debug.Log($"📊 Total: {totalSubdivisions} subdivisions (Base: {backgroundDivisions} + Focus: {focusDivisions} + Frontières: {actualSubdivisions})");
+        }
+    }
+    
+    void DisplaySubdivisionInfo() {
+        int totalSubdivisions = backgroundDivisions + focusDivisions;
+        if (useMaterialBoundarySubdivision) {
+            totalSubdivisions += maxBoundarySubdivisions;
+        }
+        
+        Debug.Log($"📊 INFORMATIONS DE SUBDIVISION:");
+        Debug.Log($"   • Subdivisions de base: {backgroundDivisions}");
+        Debug.Log($"   • Subdivisions de focus: {focusDivisions}");
+        if (useMaterialBoundarySubdivision) {
+            Debug.Log($"   • Subdivisions frontières: {maxBoundarySubdivisions}");
+        }
+        Debug.Log($"   • Total: {totalSubdivisions} subdivisions");
+        Debug.Log($"   • Triangles finaux: {triangles.Count}");
+        Debug.Log($"   • Points finaux: {points.Count}");
+        
+        if (useMaterialBoundarySubdivision && boundaryTriangles.Count > 0) {
+            Debug.Log($"   • Triangles frontières détectés: {boundaryTriangles.Count}");
         }
     }
     
@@ -1709,8 +1963,14 @@ public class HexasphereFill : MonoBehaviour {
         Gizmos.color = boundaryTriangleColor;
         int triangleCount = 0;
         
+        // Si on affiche sur toute la planète, analyser tous les triangles
+        if (applyToEntirePlanet) {
+            // Re-détecter les triangles frontières pour l'affichage
+            DetectBoundaryTriangles();
+        }
+        
         foreach (var triangle in boundaryTriangles) {
-            if (triangleCount > 100) break; // Limiter pour la performance
+            if (triangleCount > 200) break; // Limiter pour la performance (augmenté pour toute la planète)
             
             Vector3 v0 = transform.TransformPoint(triangle.points[0].ToVector3() * radius);
             Vector3 v1 = transform.TransformPoint(triangle.points[1].ToVector3() * radius);
@@ -1729,7 +1989,8 @@ public class HexasphereFill : MonoBehaviour {
         }
         
         if (showBoundaryDebug) {
-            Debug.Log($"🎨 {triangleCount} triangles frontières affichés");
+            string scope = applyToEntirePlanet ? "sur toute la planète" : "dans la zone de focus";
+            Debug.Log($"🎨 {triangleCount} triangles frontières affichés {scope}");
         }
     }
     
