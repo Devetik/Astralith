@@ -2,6 +2,13 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 
+// Enum pour les types de terrain
+public enum TerrainType {
+    Water = 0,
+    Land = 1,
+    Mountain = 2
+}
+
 public class HexasphereFill : MonoBehaviour {
 
     [Header("🎯 Subdivision par Zones")]
@@ -14,6 +21,12 @@ public class HexasphereFill : MonoBehaviour {
     [SerializeField] public bool showFocusPoint = true; // Afficher le point de focus
     [SerializeField] public Color focusPointColor = Color.red; // Couleur du point de focus
     [SerializeField] public float focusPointSize = 0.1f; // Taille du point de focus
+    
+    [Header("🔍 Subdivision par Frontières de Matériaux")]
+    [SerializeField] public bool useMaterialBoundarySubdivision = true; // Subdivision des triangles frontières
+    [SerializeField] public bool showBoundaryDebug = false; // Afficher les triangles frontières
+    [SerializeField] public Color boundaryTriangleColor = Color.yellow; // Couleur des triangles frontières
+    [SerializeField] public float boundaryDetectionThreshold = 0.1f; // Seuil de détection des frontières
 
     [Header("🔷 Hexasphere Settings")]
     [SerializeField] public int divisions = 3;
@@ -155,6 +168,10 @@ public class HexasphereFill : MonoBehaviour {
     private float lastAverageDistance = 0f; // Distance moyenne précédente
     private int lastDivisions = 0; // Nombre de divisions précédent
     private float lastAutoUpdateTime = 0f; // Temps de la dernière mise à jour automatique
+    
+    // Variables pour la subdivision par frontières de matériaux
+    private List<Triangle> boundaryTriangles = new List<Triangle>(); // Triangles à la frontière
+    private Dictionary<Triangle, TerrainType> triangleTerrainTypes = new Dictionary<Triangle, TerrainType>(); // Types de terrain par triangle
     
     void Start() {
         meshRenderer = GetComponent<MeshRenderer>();
@@ -368,6 +385,11 @@ public class HexasphereFill : MonoBehaviour {
             
             triangles = newTriangles;
         }
+        
+        // Enfin, appliquer la subdivision des triangles frontières si activée
+        if (useMaterialBoundarySubdivision) {
+            ApplyMaterialBoundarySubdivision();
+        }
     }
     
     bool IsTriangleInFocus(Triangle triangle) {
@@ -383,6 +405,138 @@ public class HexasphereFill : MonoBehaviour {
         
         // Vérifier si le triangle est dans la zone de focus
         return angularDistance <= focusRadius;
+    }
+    
+    // === MÉTHODES POUR LA SUBDIVISION PAR FRONTIÈRES DE MATÉRIAUX ===
+    
+    void ApplyMaterialBoundarySubdivision() {
+        // Détecter les triangles frontières dans la zone de focus
+        DetectBoundaryTriangles();
+        
+        // Subdiviser les triangles frontières détectés
+        SubdivideBoundaryTriangles();
+    }
+    
+    void DetectBoundaryTriangles() {
+        boundaryTriangles.Clear();
+        triangleTerrainTypes.Clear();
+        
+        // D'abord, déterminer le type de terrain pour chaque triangle
+        foreach (var triangle in triangles) {
+            if (IsTriangleInFocus(triangle)) {
+                TerrainType terrainType = DetermineTriangleTerrainType(triangle);
+                triangleTerrainTypes[triangle] = terrainType;
+            }
+        }
+        
+        // Ensuite, détecter les triangles frontières
+        foreach (var triangle in triangles) {
+            if (IsTriangleInFocus(triangle) && IsTriangleOnBoundary(triangle)) {
+                boundaryTriangles.Add(triangle);
+            }
+        }
+        
+        if (showBoundaryDebug) {
+            Debug.Log($"🔍 {boundaryTriangles.Count} triangles frontières détectés dans la zone de focus");
+        }
+    }
+    
+    TerrainType DetermineTriangleTerrainType(Triangle triangle) {
+        // Calculer l'altitude moyenne du triangle
+        Vector3 v1 = triangle.points[0].ToVector3() * radius;
+        Vector3 v2 = triangle.points[1].ToVector3() * radius;
+        Vector3 v3 = triangle.points[2].ToVector3() * radius;
+        
+        float avgHeight = (GetVertexHeight(v1) + GetVertexHeight(v2) + GetVertexHeight(v3)) / 3f;
+        
+        // Déterminer le type de terrain basé sur l'altitude
+        if (avgHeight <= waterLevel) {
+            return TerrainType.Water;
+        } else if (avgHeight <= mountainLevel) {
+            return TerrainType.Land;
+        } else {
+            return TerrainType.Mountain;
+        }
+    }
+    
+    bool IsTriangleOnBoundary(Triangle triangle) {
+        if (!triangleTerrainTypes.ContainsKey(triangle)) {
+            return false;
+        }
+        
+        TerrainType triangleType = triangleTerrainTypes[triangle];
+        
+        // Vérifier si le triangle a des voisins avec des types de terrain différents
+        List<Triangle> neighbors = FindTriangleNeighbors(triangle);
+        
+        foreach (var neighbor in neighbors) {
+            if (triangleTerrainTypes.ContainsKey(neighbor)) {
+                TerrainType neighborType = triangleTerrainTypes[neighbor];
+                if (neighborType != triangleType) {
+                    return true; // Triangle à la frontière
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    List<Triangle> FindTriangleNeighbors(Triangle triangle) {
+        List<Triangle> neighbors = new List<Triangle>();
+        
+        // Trouver les triangles qui partagent au moins un point avec ce triangle
+        foreach (var otherTriangle in triangles) {
+            if (otherTriangle == triangle) continue;
+            
+            // Vérifier si les triangles partagent des points
+            int sharedPoints = 0;
+            foreach (var point1 in triangle.points) {
+                foreach (var point2 in otherTriangle.points) {
+                    if (point1.Equals(point2)) {
+                        sharedPoints++;
+                        break;
+                    }
+                }
+            }
+            
+            // Si ils partagent au moins 2 points, ils sont voisins
+            if (sharedPoints >= 2) {
+                neighbors.Add(otherTriangle);
+            }
+        }
+        
+        return neighbors;
+    }
+    
+    void SubdivideBoundaryTriangles() {
+        List<Triangle> newTriangles = new List<Triangle>();
+        
+        foreach (var triangle in triangles) {
+            if (boundaryTriangles.Contains(triangle)) {
+                // Subdiviser le triangle frontière
+                Point mid1 = GetCachedPoint(Point.Midpoint(triangle.points[0], triangle.points[1]).Normalized);
+                Point mid2 = GetCachedPoint(Point.Midpoint(triangle.points[1], triangle.points[2]).Normalized);
+                Point mid3 = GetCachedPoint(Point.Midpoint(triangle.points[2], triangle.points[0]).Normalized);
+                
+                newTriangles.Add(new Triangle(triangle.points[0], mid1, mid3));
+                newTriangles.Add(new Triangle(triangle.points[1], mid2, mid1));
+                newTriangles.Add(new Triangle(triangle.points[2], mid3, mid2));
+                newTriangles.Add(new Triangle(mid1, mid2, mid3));
+                
+                if (showBoundaryDebug) {
+                    Debug.Log($"🔧 Triangle frontière subdivisé");
+                }
+            } else {
+                // Garder le triangle tel quel
+                newTriangles.Add(triangle);
+            }
+        }
+        
+        triangles = newTriangles;
+        
+        if (showBoundaryDebug) {
+            Debug.Log($"✅ {boundaryTriangles.Count} triangles frontières subdivisés");
+        }
     }
     
     void NormalizeAllPoints() {
@@ -1401,6 +1555,10 @@ public class HexasphereFill : MonoBehaviour {
         focusPointObject = null;
         focusPointRenderer = null;
         
+        // Réinitialiser les variables de subdivision par frontières
+        boundaryTriangles.Clear();
+        triangleTerrainTypes.Clear();
+        
         // Réinitialiser les variables
         chunkCount = 0;
         
@@ -1453,6 +1611,10 @@ public class HexasphereFill : MonoBehaviour {
     void OnDrawGizmos() {
         if (showFocusDebug && useSelectiveSubdivision) {
             DrawFocusDebug();
+        }
+        
+        if (showBoundaryDebug && useMaterialBoundarySubdivision) {
+            DrawBoundaryDebug();
         }
     }
     
@@ -1539,6 +1701,35 @@ public class HexasphereFill : MonoBehaviour {
                 Gizmos.DrawLine(v2, v0);
             }
             triangleCount++;
+        }
+    }
+    
+    void DrawBoundaryDebug() {
+        // Dessiner les triangles frontières
+        Gizmos.color = boundaryTriangleColor;
+        int triangleCount = 0;
+        
+        foreach (var triangle in boundaryTriangles) {
+            if (triangleCount > 100) break; // Limiter pour la performance
+            
+            Vector3 v0 = transform.TransformPoint(triangle.points[0].ToVector3() * radius);
+            Vector3 v1 = transform.TransformPoint(triangle.points[1].ToVector3() * radius);
+            Vector3 v2 = transform.TransformPoint(triangle.points[2].ToVector3() * radius);
+            
+            // Dessiner le triangle avec des lignes plus épaisses
+            Gizmos.DrawLine(v0, v1);
+            Gizmos.DrawLine(v1, v2);
+            Gizmos.DrawLine(v2, v0);
+            
+            // Dessiner le centre du triangle
+            Vector3 center = (v0 + v1 + v2) / 3f;
+            Gizmos.DrawWireSphere(center, 0.02f);
+            
+            triangleCount++;
+        }
+        
+        if (showBoundaryDebug) {
+            Debug.Log($"🎨 {triangleCount} triangles frontières affichés");
         }
     }
     
