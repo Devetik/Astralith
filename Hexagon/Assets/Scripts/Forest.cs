@@ -32,6 +32,11 @@ namespace HexasphereProcedural {
         [SerializeField] public float noiseLacunarity = 2.0f; // Facteur de lacunarité
         [SerializeField] public float noisePersistence = 0.5f; // Persistance du bruit
         
+        [Header("🔧 Debug Densitée")]
+        [SerializeField] public bool showPlacementStats = true; // Afficher les statistiques de placement
+        [SerializeField] public bool forceDensePlacement = false; // Forcer un placement plus dense
+        [SerializeField] public float maxAttemptsMultiplier = 20f; // Multiplicateur pour les tentatives max
+        
         [Header("🎲 Variété des Arbres")]
         [SerializeField] public GameObject[] treePrefabs = new GameObject[3]; // Tree Type 1, 2, 3
         [SerializeField] public float[] treeTypeWeights = {0.4f, 0.35f, 0.25f}; // Probabilités pour chaque type
@@ -160,12 +165,13 @@ namespace HexasphereProcedural {
         void PlaceTrees() {
             int treesPlaced = 0;
             int attempts = 0;
-            int maxAttempts = treeCount * 10; // Limite pour éviter les boucles infinies
+            int maxAttempts = Mathf.RoundToInt(treeCount * maxAttemptsMultiplier); // Limite ajustable
             int landAreaAttempts = 0;
             int patchAttempts = 0;
             int spacingAttempts = 0;
             
             Debug.Log($"Forest: Starting tree placement. WaterLevel={hexasphereFill.waterLevel}, MountainLevel={hexasphereFill.mountainLevel}");
+            Debug.Log($"Forest: TreeSpacing={treeSpacing}, MaxAttempts={maxAttempts}, ForceDense={forceDensePlacement}");
             
             while (treesPlaced < treeCount && attempts < maxAttempts) {
                 attempts++;
@@ -196,11 +202,17 @@ namespace HexasphereProcedural {
                 treesPlaced++;
             }
             
-            Debug.Log($"Forest: Placement complete. Trees placed: {treesPlaced}, Total attempts: {attempts}");
-            Debug.Log($"Forest: Failed due to land area: {landAreaAttempts}, patch: {patchAttempts}, spacing: {spacingAttempts}");
+            if (showPlacementStats) {
+                Debug.Log($"Forest: Placement complete. Trees placed: {treesPlaced}, Total attempts: {attempts}");
+                Debug.Log($"Forest: Failed due to land area: {landAreaAttempts}, patch: {patchAttempts}, spacing: {spacingAttempts}");
+                Debug.Log($"Forest: Success rate: {(float)treesPlaced/attempts*100:F1}%");
+            }
             
             if (treesPlaced < treeCount) {
                 Debug.LogWarning($"Forest: Only placed {treesPlaced} out of {treeCount} requested trees. Consider adjusting parameters.");
+                if (forceDensePlacement) {
+                    Debug.LogWarning("Forest: Try reducing patchThreshold or increasing maxAttemptsMultiplier for denser placement.");
+                }
             }
         }
         
@@ -235,6 +247,11 @@ namespace HexasphereProcedural {
         }
         
         bool IsInTreePatch(Vector3 position) {
+            // Si on force un placement dense, ignorer la contrainte de patch
+            if (forceDensePlacement) {
+                return true;
+            }
+            
             // Convertir la position en coordonnées de noise map
             Vector2 noiseCoords = WorldToNoiseMap(position);
             int x = Mathf.FloorToInt(noiseCoords.x * (patchNoiseMap.GetLength(0) - 1));
@@ -440,7 +457,7 @@ namespace HexasphereProcedural {
         void OnValidate() {
             // Valider les paramètres dans l'éditeur
             treeCount = Mathf.Max(0, treeCount);
-            treeSpacing = Mathf.Max(0.01f, treeSpacing);
+            treeSpacing = Mathf.Max(0.0001f, treeSpacing);
             treeScaleVariation = Mathf.Clamp(treeScaleVariation, 0f, 1f);
             landThreshold = Mathf.Clamp(landThreshold, 0f, 1f);
             patchThreshold = Mathf.Clamp(patchThreshold, 0f, 1f);

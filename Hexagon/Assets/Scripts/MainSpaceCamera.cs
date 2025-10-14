@@ -39,12 +39,25 @@ namespace HexasphereProcedural {
         [SerializeField] public float animationDuration = 1f; // Durée fixe de 1 seconde
         [SerializeField] public float acceptableDistanceRange = 2f; // Range de distance acceptable
         
+        [Header("🌍 Transition Vue Planétaire")]
+        [SerializeField] public float spaceTransitionDistance = 20f; // Distance à partir de laquelle on considère être dans l'espace
+        [SerializeField] public float northOrientationSpeed = 2f; // Vitesse d'orientation vers le nord
+        [SerializeField] public bool enableNorthTransition = true; // Activer/désactiver la transition vers le nord
+        [SerializeField] public bool autoExitFreeLook = true; // Sortir automatiquement du mode orientation libre
+        [SerializeField] public float maxNorthAngle = 80f; // Angle maximum vers le nord (plus agressif)
+        [SerializeField] public bool onlyApplyWhenNotFreeLooking = true; // Appliquer la transition seulement si pas en mode orientation libre
+        
         [Header("🎯 Visualisation")]
         [SerializeField] public bool showCameraToPlanetLine = true;
         [SerializeField] public Color lineColor = Color.cyan;
         [SerializeField] public bool showContactGizmo = true;
         [SerializeField] public Color contactGizmoColor = Color.red;
         [SerializeField] public float contactGizmoSize = 0.1f;
+        
+        [Header("🌍 Debug Vue Planétaire")]
+        [SerializeField] public bool showTransitionZone = true;
+        [SerializeField] public Color transitionZoneColor = Color.green;
+        [SerializeField] public bool showTransitionDebug = true;
         
 
         
@@ -83,6 +96,9 @@ namespace HexasphereProcedural {
         private Vector3 contactPoint;
         private bool hasContactPoint = false;
         private float dynamicMinDistance = 0.5f; // Distance minimale calculée dynamiquement
+        
+        // Variables pour la transition vue planétaire
+        private Quaternion targetNorthRotation;
         
         void Start() {
             cam = GetComponent<Camera>();
@@ -531,6 +547,19 @@ namespace HexasphereProcedural {
         }
         
         void StopFreeLook() {
+            // Vérifier si on est dans la zone de transition
+            if (hasSelectedPlanet && targetPlanet != null) {
+                float distanceToPlanet = Vector3.Distance(transform.position, planetCenter);
+                
+                // Si on est dans la zone de transition, conserver l'orientation
+                if (distanceToPlanet <= spaceTransitionDistance) {
+                    // Ne pas sortir du mode orientation libre dans la zone
+                    // La caméra garde son orientation actuelle
+                    return;
+                }
+            }
+            
+            // Sortir du mode orientation libre seulement si on est en dehors de la zone
             isFreeLooking = false;
         }
         
@@ -554,6 +583,15 @@ namespace HexasphereProcedural {
             Debug.Log($"Zoom: hasContactPoint={hasContactPoint}, dynamicMinDistance={dynamicMinDistance}, planetRadius={planetRadius}, effectiveMinDistance={effectiveMinDistance}, targetDistance={targetDistance}");
             
             targetDistance = Mathf.Clamp(targetDistance, effectiveMinDistance, maxDistance);
+            
+            // Forcer la mise à jour de la position même en mode freeLook
+            if (isFreeLooking) {
+                // Recalculer la position de la caméra même en mode orientation libre
+                Vector3 direction = (transform.position - planetCenter).normalized;
+                if (direction != Vector3.zero) {
+                    transform.position = planetCenter + direction * currentDistance;
+                }
+            }
         }
         
         void UpdateCamera() {
@@ -581,14 +619,24 @@ namespace HexasphereProcedural {
             
             // Gérer les différents modes de caméra
             if (isFreeLooking) {
-                // Mode orientation libre : pas de changement de position, seulement rotation
+                // Mode orientation libre : rotation libre mais position mise à jour
                 transform.rotation = freeLookRotation;
+                
+                // Mettre à jour la position même en mode orientation libre
+                Vector3 direction = (transform.position - planetCenter).normalized;
+                if (direction != Vector3.zero) {
+                    transform.position = planetCenter + direction * currentDistance;
+                }
+                
+                // Gérer la transition vue planétaire même en mode orientation libre
+                UpdatePlanetViewTransition();
             } else {
                 // Mode orbite ou normal : calculer la position autour de la planète
                 Vector3 direction = Quaternion.Euler(currentRotation) * Vector3.back;
                 Vector3 newPosition = planetCenter + direction * currentDistance;
                 transform.position = newPosition;
                 
+                // Appliquer la rotation de base (regarder la planète)
                 if (isOrbiting) {
                     // Mode orbite : regarder la planète
                     transform.LookAt(planetCenter);
@@ -596,6 +644,9 @@ namespace HexasphereProcedural {
                     // Mode normal : regarder la planète
                     transform.LookAt(planetCenter);
                 }
+                
+                // Gérer la transition vue planétaire APRÈS la rotation de base
+                UpdatePlanetViewTransition();
             }
             
             // Garder le nord en haut si activé (seulement si pas en orientation libre)
@@ -603,6 +654,21 @@ namespace HexasphereProcedural {
                 KeepNorthUp();
             }
 
+        }
+        
+        void UpdatePlanetViewTransition() {
+            if (!hasSelectedPlanet || targetPlanet == null) return;
+            
+            // Calculer la distance actuelle à la planète
+            float distanceToPlanet = Vector3.Distance(transform.position, planetCenter);
+            
+            // Debug de la zone
+            if (showTransitionDebug && Random.value < 0.1f) {
+                Debug.Log($"Zone: distance={distanceToPlanet:F1}, inZone={distanceToPlanet <= spaceTransitionDistance}, isFreeLooking={isFreeLooking}");
+            }
+            
+            // Dans la zone de transition, on ne fait rien de spécial
+            // Le FreeLook conserve automatiquement l'orientation grâce à StopFreeLook()
         }
         
         void KeepNorthUp() {
@@ -777,6 +843,18 @@ namespace HexasphereProcedural {
                                contactPoint + Vector3.right * contactGizmoSize);
                 Gizmos.DrawLine(contactPoint + Vector3.forward * contactGizmoSize, 
                                contactPoint + Vector3.back * contactGizmoSize);
+            }
+            
+            // Debug zone de transition
+            if (showTransitionZone) {
+                Gizmos.color = transitionZoneColor;
+                Gizmos.DrawWireSphere(planetCenter, spaceTransitionDistance);
+                
+                // Dessiner le pôle nord
+                Gizmos.color = Color.yellow;
+                Vector3 northPole = planetCenter + Vector3.up * planetRadius * 2f;
+                Gizmos.DrawLine(planetCenter, northPole);
+                Gizmos.DrawWireSphere(northPole, planetRadius * 0.1f);
             }
         }
     }
