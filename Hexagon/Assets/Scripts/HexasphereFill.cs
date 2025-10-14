@@ -53,25 +53,36 @@ public class HexasphereFill : MonoBehaviour {
     
     [Header("🌍 Génération Procédurale de Planète")]
     [SerializeField] public bool useProceduralGeneration = true;
-    [SerializeField] public float noiseScale = 1f;
     [SerializeField] public float heightAmplitude = 0.2f;
-    [SerializeField] public bool useAdvancedNoise = true;
-    [SerializeField] public float baseNoiseScale = 1f;
-    [SerializeField] public int baseOctaves = 4;
-    [SerializeField] public float basePersistence = 0.5f;
-    [SerializeField] public float baseLacunarity = 2f;
-    [SerializeField] public float detailNoiseScale = 2f;
-    [SerializeField] public int detailOctaves = 3;
-    [SerializeField] public float detailPersistence = 0.3f;
-    [SerializeField] public float detailLacunarity = 2f;
-    [SerializeField] public bool useRidgeNoise = true;
-    [SerializeField] public float ridgeNoiseScale = 0.5f;
-    [SerializeField] public float ridgeIntensity = 0.3f;
+    [SerializeField] public float heightMultiplier = 1f; // Multiplicateur global de hauteur (1.0 = normal, 2.0 = double, etc.)
+    [SerializeField] public bool autoScaleHeightWithRadius = true; // Ajuster automatiquement la hauteur avec le radius
+    [SerializeField] public float heightScalePower = 0.7f; // Puissance de l'ajustement (0.5 = doux, 1.0 = proportionnel)
+    [SerializeField] public bool use3DNoise = true; // Utiliser le bruit 3D (recommandé)
+    
+    [Header("🌍 Paramètres Noisemap 3D")]
+    [SerializeField] public float noise3DScale = 1f; // Échelle pour la noisemap 3D
+    [SerializeField] public int noise3DOctaves = 6; // Nombre d'octaves pour la 3D
+    [SerializeField] public float noise3DPersistence = 0.5f; // Persistance pour la 3D
+    [SerializeField] public float noise3DLacunarity = 2f; // Lacunarité pour la 3D
+    [SerializeField] public bool use3DRidgeNoise = true; // Bruit de ridges 3D
+    [SerializeField] public float ridge3DScale = 0.5f; // Échelle des ridges 3D
+    [SerializeField] public float ridge3DIntensity = 0.3f; // Intensité des ridges 3D
+    
+    [Header("🔧 Correction des Fentes")]
+    [SerializeField] public bool fixIcosahedronSeams = true; // Corriger les fentes de l'icosaèdre
+    [SerializeField] public float vertexTolerance = 0.0001f; // Tolérance pour identifier les vertices partagés
+    [SerializeField] public bool usePreciseSeamDetection = true; // Détection précise des arêtes
+    [SerializeField] public float seamDetectionRadius = 0.01f; // Rayon de détection des arêtes
+    [SerializeField] public bool useFastCache = true; // Utiliser un cache rapide optimisé
+    [SerializeField] public bool disableCacheForPerformance = false; // Désactiver le cache pour les performances
     
     [Header("🌊 Niveaux de Terrain")]
     [SerializeField] public float waterLevel = 0.0f;
     [SerializeField] public float mountainLevel = 0.3f;
+    [SerializeField] public bool autoScaleTerrainLevels = true; // Ajuster automatiquement les niveaux avec le radius
     [SerializeField] public bool useFlatOceans = true;
+    [SerializeField] public bool smoothOceanSeams = true; // Lisser les fentes dans les océans
+    [SerializeField] public float oceanSmoothingRadius = 0.05f; // Rayon de lissage des océans
     [SerializeField] public bool forceOceanLevel = true;
     
     [Header("🌊 Système Océans Avancé")]
@@ -182,6 +193,10 @@ public class HexasphereFill : MonoBehaviour {
     // Variables pour la subdivision par frontières de matériaux
     private List<Triangle> boundaryTriangles = new List<Triangle>(); // Triangles à la frontière
     private Dictionary<Triangle, TerrainType> triangleTerrainTypes = new Dictionary<Triangle, TerrainType>(); // Types de terrain par triangle
+    
+    // Cache pour les hauteurs des vertices (correction des fentes)
+    private Dictionary<Vector3, float> vertexHeightCache = new Dictionary<Vector3, float>();
+    private Dictionary<Vector3, Vector3> normalizedVertexCache = new Dictionary<Vector3, Vector3>();
     
     void Start() {
         meshRenderer = GetComponent<MeshRenderer>();
@@ -471,9 +486,12 @@ public class HexasphereFill : MonoBehaviour {
         float avgHeight = (GetVertexHeight(v1) + GetVertexHeight(v2) + GetVertexHeight(v3)) / 3f;
         
         // Déterminer le type de terrain basé sur l'altitude
-        if (avgHeight <= waterLevel) {
+        float effectiveWaterLevel = GetEffectiveWaterLevel();
+        float effectiveMountainLevel = GetEffectiveMountainLevel();
+        
+        if (avgHeight <= effectiveWaterLevel) {
             return TerrainType.Water;
-        } else if (avgHeight <= mountainLevel) {
+        } else if (avgHeight <= effectiveMountainLevel) {
             return TerrainType.Land;
         } else {
             return TerrainType.Mountain;
@@ -1195,16 +1213,16 @@ public class HexasphereFill : MonoBehaviour {
             pointToIndex[point] = vertexIndex++;
         }
         
+        // Appliquer la génération procédurale AVANT de créer les meshes
+        if (useProceduralGeneration) {
+            ApplyProceduralGenerationToAllChunks();
+        }
+        
         // Distribuer les triangles selon leur face d'origine
         DistributeTrianglesToFaceChunks(pointToIndex);
         
         // Créer les meshes des chunks par face
         CreateFaceChunkMeshes();
-        
-        // Appliquer la génération procédurale à tous les chunks (normaux et sous-chunks)
-        if (useProceduralGeneration) {
-            ApplyProceduralGenerationToAllChunks();
-        }
         
         // Désactiver le mesh principal quand on utilise le système de chunks
         if (meshFilter != null) {
@@ -1212,6 +1230,12 @@ public class HexasphereFill : MonoBehaviour {
         }
         if (meshRenderer != null) {
             meshRenderer.enabled = false;
+        }
+        
+        // Supprimer le collider du mesh principal pour éviter les conflits
+        MeshCollider mainCollider = GetComponent<MeshCollider>();
+        if (mainCollider != null) {
+            DestroyImmediate(mainCollider);
         }
     }
     
@@ -1786,6 +1810,12 @@ public class HexasphereFill : MonoBehaviour {
             meshFilter.mesh = null;
         }
         
+        // Supprimer le collider principal pour éviter les conflits avec les chunks
+        MeshCollider mainCollider = GetComponent<MeshCollider>();
+        if (mainCollider != null) {
+            DestroyImmediate(mainCollider);
+        }
+        
         // Nettoyer TOUS les enfants (chunks et autres)
         List<Transform> childrenToDestroy = new List<Transform>();
         for (int i = 0; i < transform.childCount; i++) {
@@ -1812,6 +1842,9 @@ public class HexasphereFill : MonoBehaviour {
         // Réinitialiser les variables de subdivision par frontières
         boundaryTriangles.Clear();
         triangleTerrainTypes.Clear();
+        
+        // Vider le cache des hauteurs pour forcer le recalcul
+        ClearVertexHeightCache();
         
         // Réinitialiser les variables
         chunkCount = 0;
@@ -1997,82 +2030,91 @@ public class HexasphereFill : MonoBehaviour {
     // === GÉNÉRATION PROCÉDURALE DE PLANÈTE ===
     
     float GenerateHeight(Vector3 position) {
-        if (useAdvancedNoise) {
-            return GenerateAdvancedHeight(position);
-        } else {
-            return GeneratePerlinHeight(position);
-        }
+        // Utiliser uniquement le système 3D (plus performant et naturel)
+        float height = Generate3DHeight(position);
+        
+        // Appliquer l'amplitude de base et le multiplicateur global
+        return height * heightAmplitude * heightMultiplier;
     }
     
-    float GeneratePerlinHeight(Vector3 position) {
-        // Utiliser les coordonnées sphériques pour un bruit plus naturel
-        float latitude = Mathf.Asin(position.y);
-        float longitude = Mathf.Atan2(position.z, position.x);
+    float GetEffectiveHeight(Vector3 normalizedVertex) {
+        float height = GenerateHeight(normalizedVertex);
         
-        // Convertir en coordonnées UV pour le bruit
-        float u = (longitude + Mathf.PI) / (2f * Mathf.PI);
-        float v = (latitude + Mathf.PI / 2f) / Mathf.PI;
+        // Ajuster la hauteur proportionnellement au radius
+        if (autoScaleHeightWithRadius && radius > 1f) {
+            // Utiliser un ajustement proportionnel configurable
+            float scaleFactor = Mathf.Pow(radius, heightScalePower);
+            height *= scaleFactor;
+        }
         
-        // Générer plusieurs octaves de bruit
-        float height = 0f;
-        float frequency = 1f;
-        float amplitude = heightAmplitude;
-        float maxValue = 0f;
-
-        for (int i = 0; i < 6; i++) {
-            float noiseValue = Mathf.PerlinNoise(
-                u * noiseScale * frequency,
-                v * noiseScale * frequency
-            );
-            height += noiseValue * amplitude;
-            maxValue += amplitude;
-            frequency *= 2f;
-            amplitude *= 0.5f;
-        }
-
-        // Normaliser le résultat
-        if (maxValue > 0) {
-            height = height / maxValue;
-        }
-
         return height;
     }
     
-    float GenerateAdvancedHeight(Vector3 position) {
-        // Coordonnées sphériques
-        float latitude = Mathf.Asin(position.y);
-        float longitude = Mathf.Atan2(position.z, position.x);
+    public float GetEffectiveWaterLevel() {
+        if (autoScaleTerrainLevels && autoScaleHeightWithRadius && radius > 1f) {
+            float scaleFactor = Mathf.Pow(radius, heightScalePower);
+            return waterLevel * scaleFactor;
+        }
+        return waterLevel;
+    }
+    
+    public float GetEffectiveMountainLevel() {
+        if (autoScaleTerrainLevels && autoScaleHeightWithRadius && radius > 1f) {
+            float scaleFactor = Mathf.Pow(radius, heightScalePower);
+            return mountainLevel * scaleFactor;
+        }
+        return mountainLevel;
+    }
+    
+    
+    
+    float Generate3DHeight(Vector3 position) {
+        // Utiliser directement les coordonnées 3D pour éviter les coupures
+        Vector3 scaledPosition = position * noise3DScale;
         
-        // Convertir en coordonnées UV
-        float u = (longitude + Mathf.PI) / (2f * Mathf.PI);
-        float v = (latitude + Mathf.PI / 2f) / Mathf.PI;
+        // Générer le bruit fractal 3D
+        float baseHeight = Generate3DFractalNoise(scaledPosition, noise3DOctaves, noise3DPersistence, noise3DLacunarity);
         
-        // Bruit de base (grandes structures)
-        float baseHeight = GenerateFractalNoise(u, v, baseNoiseScale, baseOctaves, basePersistence, baseLacunarity);
-        
-        // Bruit de détail (petites structures)
-        float detailHeight = GenerateFractalNoise(u, v, detailNoiseScale, detailOctaves, detailPersistence, detailLacunarity);
-        
-        // Bruit de ridges (montagnes)
+        // Ajouter le bruit de ridges 3D si activé
         float ridgeHeight = 0f;
-        if (useRidgeNoise) {
-            ridgeHeight = GenerateRidgeNoise(u, v, ridgeNoiseScale) * ridgeIntensity;
+        if (use3DRidgeNoise) {
+            ridgeHeight = Generate3DRidgeNoise(scaledPosition, ridge3DScale) * ridge3DIntensity;
         }
         
         // Combiner les bruits
-        float totalHeight = (baseHeight + detailHeight * 0.3f + ridgeHeight) * heightAmplitude;
+        float totalHeight = (baseHeight + ridgeHeight);
         
         return totalHeight;
     }
     
-    float GenerateFractalNoise(float u, float v, float scale, int octaves, float persistence, float lacunarity) {
+    float Generate3DFractalNoise(Vector3 position, int octaves, float persistence, float lacunarity) {
         float height = 0f;
         float frequency = 1f;
         float amplitude = 1f;
         float maxValue = 0f;
         
+        // Ajouter des offsets pour éviter la symétrie
+        Vector3 offset1 = new Vector3(12.34f, 56.78f, 90.12f);
+        Vector3 offset2 = new Vector3(34.56f, 78.90f, 12.34f);
+        Vector3 offset3 = new Vector3(56.78f, 90.12f, 34.56f);
+        
         for (int i = 0; i < octaves; i++) {
-            float noiseValue = Mathf.PerlinNoise(u * scale * frequency, v * scale * frequency);
+            // Utiliser des combinaisons asymétriques pour éviter la symétrie
+            Vector3 pos1 = (position + offset1) * frequency;
+            Vector3 pos2 = (position + offset2) * frequency;
+            Vector3 pos3 = (position + offset3) * frequency;
+            
+            float noise1 = Mathf.PerlinNoise(pos1.x, pos1.y);
+            float noise2 = Mathf.PerlinNoise(pos2.y, pos2.z);
+            float noise3 = Mathf.PerlinNoise(pos3.z, pos3.x);
+            
+            // Combiner avec des poids différents pour chaque octave
+            float weight1 = 0.4f + (i * 0.1f);
+            float weight2 = 0.3f + (i * 0.05f);
+            float weight3 = 0.3f - (i * 0.05f);
+            
+            float noiseValue = noise1 * weight1 + noise2 * weight2 + noise3 * weight3;
+            
             height += noiseValue * amplitude;
             maxValue += amplitude;
             frequency *= lacunarity;
@@ -2086,12 +2128,17 @@ public class HexasphereFill : MonoBehaviour {
         return height;
     }
     
-    float GenerateRidgeNoise(float u, float v, float scale) {
-        float noise1 = Mathf.PerlinNoise(u * scale, v * scale);
-        float noise2 = Mathf.PerlinNoise(u * scale * 2f, v * scale * 2f);
+    float Generate3DRidgeNoise(Vector3 position, float scale) {
+        // Générer plusieurs couches de bruit 3D pour les ridges
+        float noise1 = Mathf.PerlinNoise(position.x * scale, position.y * scale);
+        float noise2 = Mathf.PerlinNoise(position.y * scale, position.z * scale);
+        float noise3 = Mathf.PerlinNoise(position.z * scale, position.x * scale);
+        
+        // Combiner les bruits pour créer des ridges 3D
+        float combinedNoise = (noise1 + noise2 + noise3) / 3f;
         
         // Créer des ridges en utilisant la valeur absolue
-        float ridge = Mathf.Abs(noise1 - 0.5f) * 2f;
+        float ridge = Mathf.Abs(combinedNoise - 0.5f) * 2f;
         ridge = 1f - ridge;
         ridge = ridge * ridge;
         
@@ -2106,18 +2153,19 @@ public class HexasphereFill : MonoBehaviour {
             Vector3 originalVertex = vertices[i];
             Vector3 normalizedVertex = originalVertex.normalized;
             
-            float height = GenerateHeight(normalizedVertex);
+            float height = GetEffectiveHeight(normalizedVertex);
             
             // Nouveau système d'océans qui préserve la forme de base
             if (useAdvancedOceanSystem && preserveBaseShape) {
                 height = ApplyAdvancedOceanSystem(normalizedVertex, height);
             } else {
                 // Ancien système (pour compatibilité)
-                if (useFlatOceans && height <= waterLevel) {
+                float effectiveWaterLevel = GetEffectiveWaterLevel();
+                if (useFlatOceans && height <= effectiveWaterLevel) {
                     height = 0f; // Océans plats au niveau 0
-                } else if (height > waterLevel) {
+                } else if (height > effectiveWaterLevel) {
                     if (forceOceanLevel) {
-                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                        height = height - effectiveWaterLevel; // Ajuster pour que les terres partent du niveau de la mer
                     }
                 }
             }
@@ -2138,18 +2186,19 @@ public class HexasphereFill : MonoBehaviour {
             Vector3 originalVertex = faceVerticesChunks[0][i];
             Vector3 normalizedVertex = originalVertex.normalized;
             
-            float height = GenerateHeight(normalizedVertex);
+            float height = GetEffectiveHeight(normalizedVertex);
             
             // Nouveau système d'océans qui préserve la forme de base
             if (useAdvancedOceanSystem && preserveBaseShape) {
                 height = ApplyAdvancedOceanSystem(normalizedVertex, height);
             } else {
                 // Ancien système (pour compatibilité)
-                if (useFlatOceans && height <= waterLevel) {
+                float effectiveWaterLevel = GetEffectiveWaterLevel();
+                if (useFlatOceans && height <= effectiveWaterLevel) {
                     height = 0f; // Océans plats au niveau 0
-                } else if (height > waterLevel) {
+                } else if (height > effectiveWaterLevel) {
                     if (forceOceanLevel) {
-                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                        height = height - effectiveWaterLevel; // Ajuster pour que les terres partent du niveau de la mer
                     }
                 }
             }
@@ -2193,7 +2242,7 @@ public class HexasphereFill : MonoBehaviour {
                             Vector3 originalVertex = faceSubVerticesChunks[faceIndex][subIndex][i];
                             Vector3 normalizedVertex = originalVertex.normalized;
                             
-                            float height = GenerateHeight(normalizedVertex);
+                            float height = GetEffectiveHeight(normalizedVertex);
                             
                             // Nouveau système d'océans qui préserve la forme de base
                             if (useAdvancedOceanSystem && preserveBaseShape) {
@@ -2250,18 +2299,19 @@ public class HexasphereFill : MonoBehaviour {
             Vector3 originalVertex = vertices[i];
             Vector3 normalizedVertex = originalVertex.normalized;
             
-            float height = GenerateHeight(normalizedVertex);
+            float height = GetEffectiveHeight(normalizedVertex);
             
             // Nouveau système d'océans qui préserve la forme de base
             if (useAdvancedOceanSystem && preserveBaseShape) {
                 height = ApplyAdvancedOceanSystem(normalizedVertex, height);
             } else {
                 // Ancien système (pour compatibilité)
-                if (useFlatOceans && height <= waterLevel) {
+                float effectiveWaterLevel = GetEffectiveWaterLevel();
+                if (useFlatOceans && height <= effectiveWaterLevel) {
                     height = 0f; // Océans plats au niveau 0
-                } else if (height > waterLevel) {
+                } else if (height > effectiveWaterLevel) {
                     if (forceOceanLevel) {
-                        height = height - waterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                        height = height - effectiveWaterLevel; // Ajuster pour que les terres partent du niveau de la mer
                     }
                 }
             }
@@ -2287,7 +2337,7 @@ public class HexasphereFill : MonoBehaviour {
                     Vector3 originalVertex = verticesChunks[chunkIndex][i];
                     Vector3 normalizedVertex = originalVertex.normalized;
                     
-                    float height = GenerateHeight(normalizedVertex);
+                    float height = GetEffectiveHeight(normalizedVertex);
                     
                     // Nouveau système d'océans qui préserve la forme de base
                     if (useAdvancedOceanSystem && preserveBaseShape) {
@@ -2325,11 +2375,14 @@ public class HexasphereFill : MonoBehaviour {
             float avgHeight = (GetVertexHeight(vertices[p1]) + GetVertexHeight(vertices[p2]) + GetVertexHeight(vertices[p3])) / 3f;
             
             // Assigner au bon type de terrain
-            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+            float effectiveWaterLevel = GetEffectiveWaterLevel();
+            float effectiveMountainLevel = GetEffectiveMountainLevel();
+            
+            if (avgHeight <= effectiveWaterLevel) { // Océans au niveau de l'eau
                 waterTriangles.Add(p1);
                 waterTriangles.Add(p2);
                 waterTriangles.Add(p3);
-            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+            } else if (avgHeight <= effectiveMountainLevel) { // Seuil de montagne normal
                 landTriangles.Add(p1);
                 landTriangles.Add(p2);
                 landTriangles.Add(p3);
@@ -2364,9 +2417,19 @@ public class HexasphereFill : MonoBehaviour {
         ApplyPlanetMaterials();
     }
     
-    float GetVertexHeight(Vector3 vertex) {
+    public float GetVertexHeight(Vector3 vertex) {
+        if (disableCacheForPerformance) {
+            return GetVertexHeightOriginal(vertex);
+        } else if (fixIcosahedronSeams) {
+            return GetVertexHeightWithSeamFix(vertex);
+        } else {
+            return GetVertexHeightOriginal(vertex);
+        }
+    }
+    
+    float GetVertexHeightOriginal(Vector3 vertex) {
         Vector3 normalizedVertex = vertex.normalized;
-        float height = GenerateHeight(normalizedVertex);
+        float height = GetEffectiveHeight(normalizedVertex);
         
         // Appliquer le système d'océans avancé si activé
         if (useAdvancedOceanSystem && preserveBaseShape) {
@@ -2383,6 +2446,133 @@ public class HexasphereFill : MonoBehaviour {
         }
         
         return height;
+    }
+    
+    float GetVertexHeightWithSeamFix(Vector3 vertex) {
+        // Normaliser le vertex pour la comparaison
+        Vector3 normalizedVertex = vertex.normalized;
+        
+        if (useFastCache) {
+            return GetVertexHeightFastCache(normalizedVertex);
+        } else {
+            return GetVertexHeightSlowCache(normalizedVertex);
+        }
+    }
+    
+    float GetVertexHeightFastCache(Vector3 normalizedVertex) {
+        // Utiliser une clé normalisée pour un accès direct au cache
+        Vector3 cacheKey = NormalizeVertexForCache(normalizedVertex);
+        
+        if (vertexHeightCache.ContainsKey(cacheKey)) {
+            return vertexHeightCache[cacheKey];
+        } else {
+            // Calculer la nouvelle hauteur
+            float height = GetEffectiveHeight(normalizedVertex);
+            
+            // Appliquer le système d'océans avancé si activé
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                float effectiveWaterLevel = GetEffectiveWaterLevel();
+                if (useFlatOceans && height <= effectiveWaterLevel) {
+                    height = 0f; // Océans plats au niveau 0
+                } else if (height > effectiveWaterLevel) {
+                    if (forceOceanLevel) {
+                        height = height - effectiveWaterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Appliquer le lissage des océans si activé
+            if (smoothOceanSeams && height <= waterLevel) {
+                height = ApplyOceanSmoothing(normalizedVertex, height);
+            }
+            
+            // Mettre en cache
+            vertexHeightCache[cacheKey] = height;
+            
+            return height;
+        }
+    }
+    
+    float GetVertexHeightSlowCache(Vector3 normalizedVertex) {
+        // Chercher un vertex existant dans le cache avec une tolérance
+        Vector3 cachedVertex = FindCachedVertex(normalizedVertex);
+        
+        if (cachedVertex != Vector3.zero) {
+            // Utiliser la hauteur du vertex en cache
+            return vertexHeightCache[cachedVertex];
+        } else {
+            // Calculer la nouvelle hauteur
+            float height = GetEffectiveHeight(normalizedVertex);
+            
+            // Appliquer le système d'océans avancé si activé
+            if (useAdvancedOceanSystem && preserveBaseShape) {
+                height = ApplyAdvancedOceanSystem(normalizedVertex, height);
+            } else {
+                // Ancien système (pour compatibilité)
+                float effectiveWaterLevel = GetEffectiveWaterLevel();
+                if (useFlatOceans && height <= effectiveWaterLevel) {
+                    height = 0f; // Océans plats au niveau 0
+                } else if (height > effectiveWaterLevel) {
+                    if (forceOceanLevel) {
+                        height = height - effectiveWaterLevel; // Ajuster pour que les terres partent du niveau de la mer
+                    }
+                }
+            }
+            
+            // Appliquer le lissage des océans si activé
+            if (smoothOceanSeams && height <= waterLevel) {
+                height = ApplyOceanSmoothing(normalizedVertex, height);
+            }
+            
+            // Mettre en cache avec une clé normalisée précise
+            Vector3 cacheKey = NormalizeVertexForCache(normalizedVertex);
+            vertexHeightCache[cacheKey] = height;
+            normalizedVertexCache[cacheKey] = normalizedVertex;
+            
+            return height;
+        }
+    }
+    
+    Vector3 NormalizeVertexForCache(Vector3 vertex) {
+        // Normaliser avec une précision fixe pour éviter les erreurs de virgule flottante
+        float precision = 10000f; // 4 décimales de précision
+        return new Vector3(
+            Mathf.Round(vertex.x * precision) / precision,
+            Mathf.Round(vertex.y * precision) / precision,
+            Mathf.Round(vertex.z * precision) / precision
+        );
+    }
+    
+    Vector3 FindCachedVertex(Vector3 targetVertex) {
+        // Utiliser une approche plus robuste pour trouver les vertices partagés
+        Vector3 bestMatch = Vector3.zero;
+        float bestDistance = float.MaxValue;
+        
+        foreach (var cachedVertex in vertexHeightCache.Keys) {
+            float distance = Vector3.Distance(cachedVertex, targetVertex);
+            if (distance < vertexTolerance && distance < bestDistance) {
+                bestMatch = cachedVertex;
+                bestDistance = distance;
+            }
+        }
+        
+        return bestMatch;
+    }
+    
+    void ClearVertexHeightCache() {
+        vertexHeightCache.Clear();
+        normalizedVertexCache.Clear();
+    }
+    
+    float ApplyOceanSmoothing(Vector3 position, float originalHeight) {
+        // Pour les océans, utiliser une hauteur uniforme pour éviter les fentes
+        if (originalHeight <= waterLevel) {
+            return 0f; // Océans parfaitement plats
+        }
+        return originalHeight;
     }
     
     void ApplyPlanetMaterials() {
@@ -2419,15 +2609,17 @@ public class HexasphereFill : MonoBehaviour {
         // Préserver la forme de base : ne pas modifier la hauteur globale
         // Seulement aplatir les zones qui devraient être submergées
         
-        if (originalHeight <= waterLevel) {
+        float effectiveWaterLevel = GetEffectiveWaterLevel();
+        
+        if (originalHeight <= effectiveWaterLevel) {
             // Zone qui devrait être submergée
             // Au lieu de mettre à 0, on aplatit progressivement vers le niveau de l'eau
-            float flatteningFactor = Mathf.Clamp01((waterLevel - originalHeight) / waterLevel);
-            float flattenedHeight = Mathf.Lerp(originalHeight, waterLevel, flatteningFactor * oceanFlatteningStrength);
+            float flatteningFactor = Mathf.Clamp01((effectiveWaterLevel - originalHeight) / effectiveWaterLevel);
+            float flattenedHeight = Mathf.Lerp(originalHeight, effectiveWaterLevel, flatteningFactor * oceanFlatteningStrength);
             
             // Pour les océans plats, on peut encore les aplatir complètement si souhaité
             if (useFlatOceans) {
-                return waterLevel; // Niveau constant pour les océans
+                return effectiveWaterLevel; // Niveau constant pour les océans
             } else {
                 return flattenedHeight; // Aplatissement progressif
             }
@@ -2455,11 +2647,14 @@ public class HexasphereFill : MonoBehaviour {
                               GetVertexHeight(verticesChunks[chunkIndex][p3])) / 3f;
             
             // Assigner au bon type de terrain
-            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+            float effectiveWaterLevel = GetEffectiveWaterLevel();
+            float effectiveMountainLevel = GetEffectiveMountainLevel();
+            
+            if (avgHeight <= effectiveWaterLevel) { // Océans au niveau de l'eau
                 waterTriangles.Add(p1);
                 waterTriangles.Add(p2);
                 waterTriangles.Add(p3);
-            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+            } else if (avgHeight <= effectiveMountainLevel) { // Seuil de montagne normal
                 landTriangles.Add(p1);
                 landTriangles.Add(p2);
                 landTriangles.Add(p3);
@@ -2509,11 +2704,14 @@ public class HexasphereFill : MonoBehaviour {
                               GetVertexHeight(faceVerticesChunks[0][p3])) / 3f;
             
             // Assigner au bon type de terrain
-            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+            float effectiveWaterLevel = GetEffectiveWaterLevel();
+            float effectiveMountainLevel = GetEffectiveMountainLevel();
+            
+            if (avgHeight <= effectiveWaterLevel) { // Océans au niveau de l'eau
                 waterTriangles.Add(p1);
                 waterTriangles.Add(p2);
                 waterTriangles.Add(p3);
-            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+            } else if (avgHeight <= effectiveMountainLevel) { // Seuil de montagne normal
                 landTriangles.Add(p1);
                 landTriangles.Add(p2);
                 landTriangles.Add(p3);
@@ -2563,11 +2761,14 @@ public class HexasphereFill : MonoBehaviour {
                               GetVertexHeight(faceSubVerticesChunks[faceIndex][subIndex][p3])) / 3f;
             
             // Assigner au bon type de terrain
-            if (avgHeight <= waterLevel) { // Océans au niveau de l'eau
+            float effectiveWaterLevel = GetEffectiveWaterLevel();
+            float effectiveMountainLevel = GetEffectiveMountainLevel();
+            
+            if (avgHeight <= effectiveWaterLevel) { // Océans au niveau de l'eau
                 waterTriangles.Add(p1);
                 waterTriangles.Add(p2);
                 waterTriangles.Add(p3);
-            } else if (avgHeight <= mountainLevel) { // Seuil de montagne normal
+            } else if (avgHeight <= effectiveMountainLevel) { // Seuil de montagne normal
                 landTriangles.Add(p1);
                 landTriangles.Add(p2);
                 landTriangles.Add(p3);

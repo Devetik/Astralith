@@ -14,9 +14,9 @@ namespace HexasphereProcedural {
         [Header("📷 Configuration Caméra")]
         [SerializeField] public float rotationSpeed = 2f;
         [SerializeField] public float zoomSpeed = 20f;
-        [SerializeField] public float minDistance = 0.5f;
         [SerializeField] public float maxDistance = 500f;
         [SerializeField] public float defaultDistance = 3f;
+        [SerializeField] public float surfaceMargin = 0.1f; // Marge de sécurité par rapport à la surface
         
         [Header("🔄 Rotation")]
         [SerializeField] public bool keepNorthUp = true;
@@ -38,6 +38,13 @@ namespace HexasphereProcedural {
         [SerializeField] public bool smoothCameraTransition = true;
         [SerializeField] public float animationDuration = 1f; // Durée fixe de 1 seconde
         [SerializeField] public float acceptableDistanceRange = 2f; // Range de distance acceptable
+        
+        [Header("🎯 Visualisation")]
+        [SerializeField] public bool showCameraToPlanetLine = true;
+        [SerializeField] public Color lineColor = Color.cyan;
+        [SerializeField] public bool showContactGizmo = true;
+        [SerializeField] public Color contactGizmoColor = Color.red;
+        [SerializeField] public float contactGizmoSize = 0.1f;
         
 
         
@@ -72,6 +79,11 @@ namespace HexasphereProcedural {
         // États
         private bool hasSelectedPlanet = false;
         
+        // Variables pour la visualisation
+        private Vector3 contactPoint;
+        private bool hasContactPoint = false;
+        private float dynamicMinDistance = 0.5f; // Distance minimale calculée dynamiquement
+        
         void Start() {
             cam = GetComponent<Camera>();
             if (cam == null) {
@@ -99,6 +111,7 @@ namespace HexasphereProcedural {
         void Update() {
             HandleInput();
             UpdateCamera();
+            UpdateContactPoint();
             
             // Test de sélection automatique si pas de planète sélectionnée
             if (!hasSelectedPlanet && Input.GetKeyDown(KeyCode.S)) {
@@ -293,8 +306,7 @@ namespace HexasphereProcedural {
                 }
             }
             
-            // Ajuster la distance minimale et maximale basée sur la taille de la planète
-            minDistance = planetRadius * 1.5f;
+            // Ajuster la distance maximale basée sur la taille de la planète
             maxDistance = planetRadius * 5f;
             defaultDistance = planetRadius * 3f;
             
@@ -528,7 +540,20 @@ namespace HexasphereProcedural {
             if (!hasSelectedPlanet) return;
             
             targetDistance -= scroll * zoomSpeed;
-            targetDistance = Mathf.Clamp(targetDistance, minDistance, maxDistance);
+            
+            // Utiliser la distance minimale dynamique si un point de contact est disponible
+            float effectiveMinDistance;
+            if (hasContactPoint) {
+                effectiveMinDistance = dynamicMinDistance;
+            } else {
+                // Fallback : utiliser le rayon de la planète + marge de sécurité
+                effectiveMinDistance = planetRadius + surfaceMargin;
+            }
+            
+            // Debug pour voir les valeurs
+            Debug.Log($"Zoom: hasContactPoint={hasContactPoint}, dynamicMinDistance={dynamicMinDistance}, planetRadius={planetRadius}, effectiveMinDistance={effectiveMinDistance}, targetDistance={targetDistance}");
+            
+            targetDistance = Mathf.Clamp(targetDistance, effectiveMinDistance, maxDistance);
         }
         
         void UpdateCamera() {
@@ -647,6 +672,82 @@ namespace HexasphereProcedural {
         
 
         
+        void UpdateContactPoint() {
+            if (!hasSelectedPlanet || targetPlanet == null) {
+                hasContactPoint = false;
+                return;
+            }
+            
+            // Effectuer un raycast depuis la caméra vers la planète
+            Vector3 direction = (planetCenter - transform.position).normalized;
+            Ray ray = new Ray(transform.position, direction);
+            
+            // Raycast vers tous les colliders
+            RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Infinity);
+            
+            // Trier par distance pour trouver le premier contact
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            
+            // Chercher le premier hit avec le tag "Planet" ou qui appartient à la planète ciblée
+            foreach (RaycastHit hit in hits) {
+                // Vérifier si c'est un objet avec le tag "Planet"
+                if (hit.collider.CompareTag("Planet")) {
+                    // Vérifier si c'est la planète ciblée ou un de ses chunks
+                    if (IsPlanetOrChunk(hit.collider.transform)) {
+                        contactPoint = hit.point;
+                        hasContactPoint = true;
+                        
+                        // Calculer la distance minimale dynamiquement
+                        // La distance minimale doit être la distance du centre à la surface + marge
+                        float distanceFromCenterToSurface = Vector3.Distance(planetCenter, contactPoint);
+                        dynamicMinDistance = distanceFromCenterToSurface + surfaceMargin;
+                        
+                        // Debug pour voir les valeurs
+                        Debug.Log($"Contact détecté: distanceFromCenterToSurface={distanceFromCenterToSurface}, surfaceMargin={surfaceMargin}, dynamicMinDistance={dynamicMinDistance}");
+                        
+                        // S'assurer que la distance minimale n'est pas négative
+                        dynamicMinDistance = Mathf.Max(dynamicMinDistance, 0.1f);
+                        
+                        return;
+                    }
+                }
+            }
+            
+            // Si aucun contact trouvé, utiliser le point le plus proche sur la sphère
+            Vector3 toPlanet = planetCenter - transform.position;
+            float distanceToCenter = toPlanet.magnitude;
+            if (distanceToCenter > 0) {
+                Vector3 directionToPlanet = toPlanet.normalized;
+                contactPoint = planetCenter - directionToPlanet * planetRadius;
+                hasContactPoint = true;
+                
+                // Calculer la distance minimale basée sur le rayon de la planète
+                dynamicMinDistance = planetRadius + surfaceMargin;
+            } else {
+                hasContactPoint = false;
+            }
+        }
+        
+        bool IsPlanetOrChunk(Transform hitTransform) {
+            // Vérifier si c'est la planète ciblée elle-même
+            if (hitTransform == targetPlanet) {
+                return true;
+            }
+            
+            // Vérifier si c'est un enfant de la planète ciblée (chunk)
+            if (hitTransform.IsChildOf(targetPlanet)) {
+                return true;
+            }
+            
+            // Vérifier si c'est un parent de la planète ciblée
+            if (targetPlanet.IsChildOf(hitTransform)) {
+                return true;
+            }
+            
+            return false;
+        }
+        
+        
         void OnDrawGizmos() {
             if (!hasSelectedPlanet || targetPlanet == null) return;
             
@@ -658,9 +759,25 @@ namespace HexasphereProcedural {
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(planetCenter, currentDistance);
             
-            // Dessiner la ligne vers la planète
-            Gizmos.color = Color.red;
-            Gizmos.DrawLine(transform.position, planetCenter);
+            // Dessiner la ligne entre la caméra et la planète si activé
+            if (showCameraToPlanetLine) {
+                Gizmos.color = lineColor;
+                Gizmos.DrawLine(transform.position, planetCenter);
+            }
+            
+            // Dessiner le gizmo de contact si activé et disponible
+            if (showContactGizmo && hasContactPoint) {
+                Gizmos.color = contactGizmoColor;
+                Gizmos.DrawWireSphere(contactPoint, contactGizmoSize);
+                
+                // Dessiner une croix au point de contact
+                Gizmos.DrawLine(contactPoint + Vector3.up * contactGizmoSize, 
+                               contactPoint + Vector3.down * contactGizmoSize);
+                Gizmos.DrawLine(contactPoint + Vector3.left * contactGizmoSize, 
+                               contactPoint + Vector3.right * contactGizmoSize);
+                Gizmos.DrawLine(contactPoint + Vector3.forward * contactGizmoSize, 
+                               contactPoint + Vector3.back * contactGizmoSize);
+            }
         }
     }
 }

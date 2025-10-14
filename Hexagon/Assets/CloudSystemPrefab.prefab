@@ -1,0 +1,163 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5788522528131789173
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8338616106954597093}
+  - component: {fileID: 3059826225485646879}
+  - component: {fileID: 4235902993505618146}
+  - component: {fileID: 8214224618409765905}
+  - component: {fileID: 8699315813727672265}
+  - component: {fileID: 4979378823238977470}
+  m_Layer: 0
+  m_Name: CloudSystemPrefab
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8338616106954597093
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.32621828, y: -0.380982, z: 1.7348483}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3059826225485646879
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81327e3c56514054ab0547a039f6e9c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  planetTransform: {fileID: 0}
+  planetRadius: 1.2
+  cloudMesh: {fileID: 0}
+  cloudMaterial: {fileID: 0}
+  cloudSize: 0.5
+  maxScale: 1
+  cloudLayers: 3
+  rotationSpeed: 10
+  layerSpeedVariation: 0.3
+  reverseRotation: 0
+  timeScale: 1
+  texScale: 1
+  minNoiseSize: 0.5
+  sizeScale: 0.25
+  cam: {fileID: 0}
+  maxDist: 50
+  batchesToCreate: 5
+  cloudsPerBatch: 31
+  heightVariation: 0.2
+  radiusVariation: 0.1
+  speedVariation: 0.5
+--- !u!114 &4235902993505618146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db8e35b95c5f94e4bbc2f680f9cdb70f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cloudSize: 0.5
+  segments: 8
+  generateOnStart: 1
+--- !u!114 &8214224618409765905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32a2e4aaa29015041ad7df37ca76d12f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseCloudMaterial: {fileID: 0}
+  cloudShader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
+  cloudColor: {r: 1, g: 1, b: 1, a: 1}
+  cloudColorVariation: {r: 0.9, g: 0.9, b: 1, a: 0.6}
+  cloudOpacity: 0.7
+  cloudBrightness: 1.2
+  animateClouds: 1
+  animationSpeed: 1
+  windDirection: {x: 1, y: 0.5}
+  useFogEffect: 1
+  fogDensity: 0.1
+  fogColor: {r: 0.8, g: 0.8, b: 1, a: 0.3}
+--- !u!114 &8699315813727672265
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eee4bd2691645b847a43f98c4005eb1a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  planetTransform: {fileID: 0}
+  cloudSystem: {fileID: 0}
+  meshGenerator: {fileID: 0}
+  materialManager: {fileID: 0}
+  toggleCloudsKey: 99
+  changeSpeedKey: 118
+  changeRadiusKey: 98
+  reverseRotationKey: 114
+  autoSetup: 0
+  showDebugInfo: 1
+--- !u!114 &4979378823238977470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5788522528131789173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a79d3cb490a01145bff8d5ae5e7ea6d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableLOD: 1
+  lodDistances:
+  - 20
+  - 50
+  - 100
+  lodCloudCounts: 640000003200000019000000
+  lodUpdateInterval: 0.1
+  enableFrustumCulling: 1
+  enableDistanceCulling: 1
+  maxRenderDistance: 200
+  cullingMargin: 10
+  enableBatching: 1
+  maxBatchSize: 1023
+  enableDynamicBatching: 1
+  enableAnimationOptimization: 1
+  animationUpdateInterval: 0.05
+  useTimeBasedAnimation: 1
+  showPerformanceStats: 1
+  logPerformanceWarnings: 1

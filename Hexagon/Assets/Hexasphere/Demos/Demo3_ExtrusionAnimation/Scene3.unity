@@ -375,7 +375,7 @@ GameObject:
   - component: {fileID: 898969035}
   m_Layer: 0
   m_Name: Sphere
-  m_TagString: Planet
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -463,7 +463,7 @@ Transform:
   m_GameObject: {fileID: 898969034}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 10.63}
+  m_LocalPosition: {x: -66.91, y: 0, z: 10.63}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -483,7 +483,7 @@ GameObject:
   - component: {fileID: 993790992}
   m_Layer: 0
   m_Name: Sun
-  m_TagString: Planet
+  m_TagString: Sun
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -647,7 +647,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1379864729}
+  - component: {fileID: 1379864730}
   - component: {fileID: 1379864728}
+  - component: {fileID: 1379864731}
   m_Layer: 0
   m_Name: FillHexa
   m_TagString: Untagged
@@ -667,42 +669,63 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 705339d84aacbad4791da324596944fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useSelectiveSubdivision: 1
+  useSelectiveSubdivision: 0
   focusPoint: {x: 0.8194865, y: 0.016779698, z: -0.57285273}
-  focusRadius: 1.6
-  focusDivisions: 4
-  backgroundDivisions: 6
+  focusRadius: 0.4
+  focusDivisions: 3
+  backgroundDivisions: 3
   showFocusDebug: 0
   showFocusPoint: 1
   focusPointColor: {r: 1, g: 0, b: 0, a: 1}
   focusPointSize: 0.1
+  useMaterialBoundarySubdivision: 0
+  applyToEntirePlanet: 0
+  showBoundaryDebug: 0
+  boundaryTriangleColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  boundaryDetectionThreshold: 0.1
+  maxBoundarySubdivisions: 1
+  showSubdivisionInfo: 0
+  useOptimizedNeighborDetection: 0
+  useSubdivisionLevelDetection: 0
+  complexityThreshold: 0.1
+  altitudeWeight: 0.4
+  terrainWeight: 0.3
+  sizeWeight: 0.2
+  boundaryWeight: 0.1
   divisions: 5
-  radius: 1
+  radius: 50
   generateOnStart: 1
-  showDebugInfo: 1
+  showDebugInfo: 0
   showWireframe: 0
   hexagonMaterial: {fileID: 2100000, guid: ec08895d456e6694282810f940bfe9de, type: 2}
   hexagonColor: {r: 0, g: 0, b: 1, a: 1}
   fixTriangleOrientation: 1
   useSphericalUVs: 1
   useProceduralGeneration: 1
-  noiseScale: 1
   heightAmplitude: 1
-  useAdvancedNoise: 1
-  baseNoiseScale: 1
-  baseOctaves: 7
-  basePersistence: 0.54
-  baseLacunarity: 2
-  detailNoiseScale: 3.22
-  detailOctaves: 3
-  detailPersistence: 0.3
-  detailLacunarity: 2
-  useRidgeNoise: 1
-  ridgeNoiseScale: 0.5
-  ridgeIntensity: 0.3
-  waterLevel: 0.87
+  heightMultiplier: 1
+  autoScaleHeightWithRadius: 1
+  heightScalePower: 1.15
+  use3DNoise: 1
+  noise3DScale: 1
+  noise3DOctaves: 6
+  noise3DPersistence: 0.5
+  noise3DLacunarity: 2
+  use3DRidgeNoise: 1
+  ridge3DScale: 0.5
+  ridge3DIntensity: 0.3
+  fixIcosahedronSeams: 1
+  vertexTolerance: 0.0001
+  usePreciseSeamDetection: 1
+  seamDetectionRadius: 0.01
+  useFastCache: 1
+  disableCacheForPerformance: 0
+  waterLevel: 0.79
   mountainLevel: 0.91
+  autoScaleTerrainLevels: 1
   useFlatOceans: 1
+  smoothOceanSeams: 1
+  oceanSmoothingRadius: 0.05
   forceOceanLevel: 1
   useAdvancedOceanSystem: 1
   preserveBaseShape: 1
@@ -716,26 +739,26 @@ MonoBehaviour:
   useIcosahedronChunking: 1
   showChunkDebug: 0
   chunkColors:
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
-  - {r: 0, g: 0, b: 0, a: 0}
+  - {r: 0.8, g: 0.16, b: 0.16, a: 1}
+  - {r: 0.8, g: 0.352, b: 0.16, a: 1}
+  - {r: 0.8, g: 0.544, b: 0.16, a: 1}
+  - {r: 0.8, g: 0.73600006, b: 0.16, a: 1}
+  - {r: 0.672, g: 0.8, b: 0.16, a: 1}
+  - {r: 0.48, g: 0.8, b: 0.16, a: 1}
+  - {r: 0.28799996, g: 0.8, b: 0.16, a: 1}
+  - {r: 0.16, g: 0.8, b: 0.22399993, a: 1}
+  - {r: 0.16, g: 0.8, b: 0.41600007, a: 1}
+  - {r: 0.16, g: 0.8, b: 0.60799986, a: 1}
+  - {r: 0.16, g: 0.8, b: 0.8, a: 1}
+  - {r: 0.16, g: 0.60799986, b: 0.8, a: 1}
+  - {r: 0.16, g: 0.41599992, b: 0.8, a: 1}
+  - {r: 0.16, g: 0.22400008, b: 0.8, a: 1}
+  - {r: 0.28799987, g: 0.16, b: 0.8, a: 1}
+  - {r: 0.48, g: 0.16, b: 0.8, a: 1}
+  - {r: 0.6720001, g: 0.16, b: 0.8, a: 1}
+  - {r: 0.8, g: 0.16, b: 0.73599976, a: 1}
+  - {r: 0.8, g: 0.16, b: 0.54400027, a: 1}
+  - {r: 0.8, g: 0.16, b: 0.35200012, a: 1}
   useChunkProtection: 1
   maxVerticesPerFaceChunk: 65000
   maxTrianglesPerFaceChunk: 100000
@@ -775,6 +798,79 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1379864730
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379864727}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c9a5e0914159e34e9bfe9405fe3b19f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableFog: 1
+  fogDensity: 0.02
+  fogColor: {r: 0.8, g: 0.9, b: 1, a: 0.3}
+  fogStartDistance: 0
+  fogEndDistance: 100
+  enableClouds: 1
+  cloudCount: 50
+  cloudRadius: 0.05
+  cloudSizeMin: 0.02
+  cloudSizeMax: 62.6
+  cloudColor: {r: 1, g: 0.103773475, b: 0.103773475, a: 0.6}
+  cloudSpeed: 0.02
+  useProceduralClouds: 1
+  fixCloudPosition: 1
+  planetTransform: {fileID: 0}
+  planetRadius: 1
+  autoDetectPlanet: 1
+  cloudMaterial: {fileID: 2100000, guid: 54cb391efabab4d46b4e6e76260bc0af, type: 2}
+  fogMaterial: {fileID: 2100000, guid: 54cb391efabab4d46b4e6e76260bc0af, type: 2}
+  useLOD: 0
+  lodDistance: 50
+  maxCloudsPerFrame: 5
+  forceCloudsActive: 1
+--- !u!114 &1379864731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379864727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12345678901234567890123456789012, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  treeCount: 687
+  TreeScale: 0.3
+  treeSpacing: 0.01
+  treeScaleVariation: 0.02
+  landThreshold: 0.3
+  oceanLevel: 0
+  patchNoiseScale: 0.02
+  patchThreshold: 0.02
+  minTreesPerPatch: 9
+  maxTreesPerPatch: 26
+  noiseIntensity: 2.5
+  noiseOctaves: 3
+  noiseLacunarity: 2
+  noisePersistence: 0.5
+  treePrefabs:
+  - {fileID: 4787418128815497265, guid: 884b1522d2233ba458c717b4a0bcb7ec, type: 3}
+  - {fileID: 5489413398876402800, guid: 0ce75f3103f34234aa2f68736de36f41, type: 3}
+  - {fileID: 852449231536058202, guid: f96f03de48ddb6a469b748b1b109f275, type: 3}
+  treeTypeWeights:
+  - 0.4
+  - 0.35
+  - 0.25
+  showDebugInfo: 1
+  showTreePositions: 1
+  debugColor: {r: 0, g: 1, b: 0, a: 1}
+  regenerateOnStart: 1
 --- !u!1 &1559964992
 GameObject:
   m_ObjectHideFlags: 0
@@ -844,7 +940,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.01
   far clip plane: 1000
   field of view: 60
   orthographic: 0
@@ -873,7 +969,7 @@ Transform:
   m_GameObject: {fileID: 1559964992}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -3.26}
+  m_LocalPosition: {x: 0, y: 0, z: -158.79}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -972,13 +1068,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4b5331bcee126d4680d5a7d6d1fd900, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetPlanet: {fileID: 0}
+  targetPlanet: {fileID: 1379864729}
   autoFindPlanet: 1
   rotationSpeed: 2
   zoomSpeed: 20
-  minDistance: 0.5
-  maxDistance: 500
-  defaultDistance: 3
+  maxDistance: 1000
+  defaultDistance: 150
+  surfaceMargin: 0.3
   keepNorthUp: 1
   smoothRotation: 5
   smoothZoom: 5
@@ -992,6 +1088,11 @@ MonoBehaviour:
   smoothCameraTransition: 1
   animationDuration: 1
   acceptableDistanceRange: 2
+  showCameraToPlanetLine: 1
+  lineColor: {r: 0, g: 1, b: 1, a: 1}
+  showContactGizmo: 1
+  contactGizmoColor: {r: 1, g: 0, b: 0, a: 1}
+  contactGizmoSize: 0.1
   currentRotation: {x: 0, y: 0, z: 0}
   currentDistance: 0
   targetRotation: {x: 0, y: 0, z: 0}
