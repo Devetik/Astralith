@@ -1129,6 +1129,19 @@ MonoBehaviour:
   clickMaxMovement: 5
   showDebugInfo: 1
   debugColor: {r: 0, g: 1, b: 1, a: 1}
+  showContactGizmo: 1
+  contactGizmoColor: {r: 1, g: 0, b: 0, a: 1}
+  contactGizmoSize: 0.1
+  planetRadius: 1
+  PlanetAreaFactor: 1
+  enableZoom: 1
+  minZoomSpeed: 0.1
+  maxZoomSpeed: 100
+  ZoomSpeed: 1
+  zoomExponent: 2
+  contactBuffer: 0.5
+  maxZoomDistance: 50
+  maxLookUpAngle: 45
 --- !u!1 &1652394923
 GameObject:
   m_ObjectHideFlags: 0
