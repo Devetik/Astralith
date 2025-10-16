@@ -1191,7 +1191,7 @@ MonoBehaviour:
   contactGizmoColor: {r: 1, g: 0, b: 0, a: 1}
   contactGizmoSize: 0.1
   planetRadius: 1
-  PlanetAreaFactor: 1
+  PlanetAreaFactor: 1.5
   enableZoom: 1
   minZoomSpeed: 0.1
   maxZoomSpeed: 100
@@ -1202,7 +1202,15 @@ MonoBehaviour:
   enableSmoothZoom: 1
   smoothZoomTime: 0.5
   zoomDeceleration: 8
+  enableMovement: 1
+  baseMovementSpeed: 25
+  speedMultiplier: 3
+  rollSpeed: 45
+  enableCameraRotation: 1
+  mouseSensitivity: 2
   maxLookUpAngle: 45
+  maxLookDownAngle: 80
+  oldMaxLookUpAngle: 45
   enableInnerSphere: 1
   sphereStartDistance: 30
   sphereMaxSizePercent: 1.81
@@ -1399,7 +1407,7 @@ Transform:
   m_GameObject: {fileID: 7220951646793784326}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -15.5, z: 0}
   m_LocalScale: {x: 0.46, y: 0.46, z: 0.46}
   m_ConstrainProportionsScale: 0
   m_Children: []

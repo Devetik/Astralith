@@ -38,8 +38,23 @@ public class CameraPlanet : MonoBehaviour
     [SerializeField] public float smoothZoomTime = 0.5f; // Durée de lissage du zoom
     [SerializeField] public float zoomDeceleration = 8f; // Vitesse de décélération
     
+    [Header("🎮 Contrôles de Mouvement")]
+    [SerializeField] public bool enableMovement = true; // Activer les contrôles de mouvement
+    [SerializeField] public float baseMovementSpeed = 5f; // Vitesse de base du mouvement
+    [SerializeField] public float speedMultiplier = 2f; // Multiplicateur de vitesse avec Shift
+    [SerializeField] public float rollSpeed = 45f; // Vitesse de rotation (roll) en degrés/seconde
+    
+    // Référence au Rigidbody pour le mouvement physique
+    private Rigidbody cameraRigidbody;
+    
+    [Header("🖱️ Rotation de la Caméra")]
+    [SerializeField] public bool enableCameraRotation = true; // Activer la rotation de la caméra
+    [SerializeField] public float mouseSensitivity = 2f; // Sensibilité de la souris
+    [SerializeField] public float maxLookUpAngle = 80f; // Angle maximum vers le haut
+    [SerializeField] public float maxLookDownAngle = 80f; // Angle maximum vers le bas
+    
     [Header("📐 Orientation")]
-    [SerializeField] public float maxLookUpAngle = 45f; // Angle maximum vers le haut (en degrés)
+    [SerializeField] public float oldMaxLookUpAngle = 45f; // Angle maximum vers le haut (ancien système)
     
     [Header("🌐 Sphère Intérieure")]
     [SerializeField] public bool enableInnerSphere = true; // Activer le système de sphère intérieure
@@ -86,6 +101,13 @@ public class CameraPlanet : MonoBehaviour
     private float zoomVelocity = 0f; // Vitesse actuelle du zoom
     private float lastZoomTime = 0f; // Temps du dernier cran de molette
     
+    // Variables de mouvement (simplifiées pour le mode libre)
+    // Plus de variables de lissage nécessaires
+    
+    // Variables de rotation de la caméra
+    private float rotationX = 0f; // Rotation verticale (pitch)
+    private float rotationY = 0f; // Rotation horizontale (yaw)
+    
     void Start()
     {
         cam = GetComponent<Camera>();
@@ -93,6 +115,31 @@ public class CameraPlanet : MonoBehaviour
         {
             cam = gameObject.AddComponent<Camera>();
         }
+        
+        // Initialiser le Rigidbody pour les collisions
+        cameraRigidbody = GetComponent<Rigidbody>();
+        if (cameraRigidbody == null)
+        {
+            cameraRigidbody = gameObject.AddComponent<Rigidbody>();
+        }
+        
+        // Configuration du Rigidbody pour la caméra (toujours appliquer)
+        cameraRigidbody.isKinematic = false; // Doit être false pour les collisions
+        cameraRigidbody.useGravity = false;
+        cameraRigidbody.linearDamping = 2f; // Légère résistance pour un mouvement plus doux
+        cameraRigidbody.angularDamping = 5f; // Résistance angulaire pour éviter les rotations
+        cameraRigidbody.mass = 1f; // Masse normale
+        
+        // Debug pour vérifier la configuration
+        if (showDebugInfo)
+        {
+            Debug.Log($"CameraPlanet: Rigidbody configuré - isKinematic: {cameraRigidbody.isKinematic}, useGravity: {cameraRigidbody.useGravity}");
+        }
+        
+        // Initialiser les rotations de la caméra
+        Vector3 eulerAngles = transform.rotation.eulerAngles;
+        rotationX = eulerAngles.x;
+        rotationY = eulerAngles.y;
     }
 
     void Update()
@@ -102,6 +149,7 @@ public class CameraPlanet : MonoBehaviour
         UpdateTracking();
         UpdateContactDetection();
         HandleZoom();
+        HandleMovement();
         UpdateInnerSphere();
     }
     
@@ -395,6 +443,172 @@ public class CameraPlanet : MonoBehaviour
             }
         }
     }
+    
+    void HandleMovement()
+    {
+        if (!enableMovement) return;
+        
+        // Détecter si une touche de mouvement est pressée
+        bool isMovementKeyPressed = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.S) || 
+                                   Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.D) || 
+                                   Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftControl) ||
+                                   Input.GetKey(KeyCode.Q) || Input.GetKey(KeyCode.E);
+        
+        // Si une touche de mouvement est pressée, désélectionner la planète
+        if (isMovementKeyPressed && currentTarget != null)
+        {
+            StopTracking();
+            if (showDebugInfo)
+            {
+                Debug.Log("CameraPlanet: Movement key pressed - Deselecting planet");
+            }
+        }
+        
+        // Appliquer le mouvement libre seulement si aucune planète n'est ciblée
+        if (currentTarget == null)
+        {
+            ApplyFreeMovement();
+            HandleCameraRotation();
+        }
+    }
+    
+    void ApplyFreeMovement()
+    {
+        // Détecter les inputs de mouvement
+        Vector3 input = Vector3.zero;
+        
+        // Mouvement avant/arrière (W/S)
+        if (Input.GetKey(KeyCode.W)) input.z += 1f;
+        if (Input.GetKey(KeyCode.S)) input.z -= 1f;
+        
+        // Strafe gauche/droite (A/D)
+        if (Input.GetKey(KeyCode.A)) input.x -= 1f;
+        if (Input.GetKey(KeyCode.D)) input.x += 1f;
+        
+        // Mouvement haut/bas (Space/Ctrl)
+        if (Input.GetKey(KeyCode.Space)) input.y += 1f;
+        if (Input.GetKey(KeyCode.LeftControl)) input.y -= 1f;
+        
+        // Roll gauche/droite (Q/E)
+        float roll = 0f;
+        if (Input.GetKey(KeyCode.Q)) roll -= 1f;
+        if (Input.GetKey(KeyCode.E)) roll += 1f;
+        
+        // Multiplicateur de vitesse avec Shift
+        float speedMultiplier = Input.GetKey(KeyCode.LeftShift) ? this.speedMultiplier : 1f;
+        
+        // Appliquer le mouvement direct (pas de lissage)
+        if (input.magnitude > 0.01f)
+        {
+            // Calculer le mouvement dans l'espace local de la caméra
+            Vector3 forward = transform.forward;
+            Vector3 right = transform.right;
+            Vector3 up = transform.up;
+            
+            Vector3 movement = (forward * input.z + right * input.x + up * input.y) * baseMovementSpeed * speedMultiplier * Time.deltaTime;
+            
+            // Utiliser le Rigidbody pour le mouvement (respecte les collisions)
+            if (cameraRigidbody != null && !cameraRigidbody.isKinematic)
+            {
+                // Utiliser AddForce pour un mouvement plus doux
+                Vector3 force = movement / Time.deltaTime * cameraRigidbody.mass;
+                cameraRigidbody.AddForce(force, ForceMode.Force);
+            }
+            else
+            {
+                // Fallback si pas de Rigidbody ou si kinematic
+                transform.position += movement;
+            }
+        }
+        else
+        {
+            // Arrêter le mouvement quand aucune touche n'est pressée (plus doux)
+            if (cameraRigidbody != null && !cameraRigidbody.isKinematic)
+            {
+                // Appliquer une force opposée pour ralentir progressivement
+                Vector3 dampingForce = -cameraRigidbody.linearVelocity * 10f;
+                cameraRigidbody.AddForce(dampingForce, ForceMode.Force);
+            }
+        }
+        
+        // Appliquer le roll direct (pas de lissage)
+        if (Mathf.Abs(roll) > 0.01f)
+        {
+            transform.Rotate(0, 0, roll * rollSpeed * Time.deltaTime, Space.Self);
+        }
+    }
+    
+    void HandleCameraRotation()
+    {
+        if (!enableCameraRotation) return;
+        
+        // Détecter le clic droit maintenu
+        if (Input.GetMouseButton(1))
+        {
+            // Obtenir le mouvement de la souris
+            float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+            float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+            
+            // Mettre à jour les rotations
+            rotationY += mouseX;
+            rotationX -= mouseY;
+            
+            // Limiter la rotation verticale
+            rotationX = Mathf.Clamp(rotationX, -maxLookDownAngle, maxLookUpAngle);
+            
+            // Appliquer la rotation
+            transform.rotation = Quaternion.Euler(rotationX, rotationY, 0f);
+        }
+    }
+    
+    bool IsPositionSafe(Vector3 position)
+    {
+        // Chercher tous les objets avec les tags de planètes
+        string[] planetTags = {"Planet", "Moon", "Sun"};
+        
+        foreach (string tag in planetTags)
+        {
+            GameObject[] planets = GameObject.FindGameObjectsWithTag(tag);
+            foreach (GameObject planet in planets)
+            {
+                // Calculer la distance au centre de la planète
+                float distanceToCenter = Vector3.Distance(position, planet.transform.position);
+                
+                // Estimer le rayon de la planète (utiliser le collider ou une valeur par défaut)
+                float planetRadius = GetPlanetRadius(planet);
+                
+                // Vérifier si on est trop près de la surface
+                if (distanceToCenter < planetRadius + contactBuffer)
+                {
+                    return false; // Position non sécurisée
+                }
+            }
+        }
+        
+        return true; // Position sécurisée
+    }
+    
+    float GetPlanetRadius(GameObject planet)
+    {
+        // Essayer de trouver un collider sphérique
+        SphereCollider sphereCollider = planet.GetComponent<SphereCollider>();
+        if (sphereCollider != null)
+        {
+            return sphereCollider.radius * Mathf.Max(planet.transform.lossyScale.x, planet.transform.lossyScale.y, planet.transform.lossyScale.z);
+        }
+        
+        // Essayer de trouver un collider de mesh
+        MeshCollider meshCollider = planet.GetComponent<MeshCollider>();
+        if (meshCollider != null)
+        {
+            // Estimer le rayon basé sur la bounding box
+            Bounds bounds = meshCollider.bounds;
+            return Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z) * 0.5f;
+        }
+        
+        // Utiliser le rayon par défaut
+        return planetRadius;
+    }
 
     Quaternion CalculateRotation(float currentDistance)
     {
@@ -680,6 +894,11 @@ public class CameraPlanet : MonoBehaviour
         sphereTargetPoint = Vector3.zero;
         manualRotationOffset = Quaternion.identity;
         isManualRotation = false;
+        
+        // Réinitialiser les rotations de la caméra
+        Vector3 eulerAngles = transform.rotation.eulerAngles;
+        rotationX = eulerAngles.x;
+        rotationY = eulerAngles.y;
         
         if (showDebugInfo)
         {
