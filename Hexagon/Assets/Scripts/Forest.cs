@@ -26,6 +26,12 @@ namespace HexasphereProcedural {
         [SerializeField] public int minTreesPerPatch = 8;
         [SerializeField] public int maxTreesPerPatch = 25;
         
+        [Header("🔄 Rotation des Arbres")]
+        [SerializeField] public bool useRandomRotation = true; // Activer la rotation aléatoire
+        [SerializeField] public float maxRotationX = 15f; // Rotation X max en degrés
+        [SerializeField] public float maxRotationZ = 15f; // Rotation Z max en degrés
+        [SerializeField] public float rotationDistribution = 2f; // Facteur de distribution (plus élevé = plus centré sur 0)
+        
         [Header("🌊 Intensité du Bruit")]
         [SerializeField] public float noiseIntensity = 2.5f; // Multiplicateur d'intensité du bruit
         [SerializeField] public int noiseOctaves = 3; // Nombre d'octaves pour un bruit plus complexe
@@ -332,7 +338,15 @@ namespace HexasphereProcedural {
             // Orienter l'arbre vers l'extérieur de la planète
             Vector3 directionToCenter = (planetCenter - position).normalized;
             // L'arbre doit pointer vers l'extérieur, donc utiliser la direction inverse
-            tree.transform.rotation = Quaternion.FromToRotation(Vector3.up, -directionToCenter);
+            Quaternion baseRotation = Quaternion.FromToRotation(Vector3.up, -directionToCenter);
+            
+            // Appliquer une rotation aléatoire si activée
+            if (useRandomRotation) {
+                Quaternion randomRotation = GenerateRandomRotation();
+                tree.transform.rotation = baseRotation * randomRotation;
+            } else {
+                tree.transform.rotation = baseRotation;
+            }
             
             // Appliquer une variation d'échelle
             float scaleVariation = TreeScale + Random.Range(-treeScaleVariation, treeScaleVariation);
@@ -342,6 +356,30 @@ namespace HexasphereProcedural {
             spawnedTrees.Add(tree);
             treePositions.Add(position);
             treeRotations.Add(tree.transform.rotation);
+        }
+        
+        Quaternion GenerateRandomRotation() {
+            // Rotation Y complète (360°)
+            float rotationY = Random.Range(0f, 360f);
+            
+            // Rotations X et Z avec distribution centrée sur 0
+            float rotationX = GenerateCenteredRandomValue(maxRotationX, rotationDistribution);
+            float rotationZ = GenerateCenteredRandomValue(maxRotationZ, rotationDistribution);
+            
+            return Quaternion.Euler(rotationX, rotationY, rotationZ);
+        }
+        
+        float GenerateCenteredRandomValue(float maxValue, float distribution) {
+            // Utiliser une distribution normale pour centrer les valeurs sur 0
+            // Plus le facteur de distribution est élevé, plus les valeurs sont centrées sur 0
+            float randomValue = Random.Range(-maxValue, maxValue);
+            
+            // Appliquer une fonction de distribution pour centrer sur 0
+            float sign = randomValue >= 0 ? 1f : -1f;
+            float normalizedValue = Mathf.Abs(randomValue) / maxValue;
+            float distributedValue = Mathf.Pow(normalizedValue, distribution);
+            
+            return sign * distributedValue * maxValue;
         }
         
         GameObject SelectTreeType() {

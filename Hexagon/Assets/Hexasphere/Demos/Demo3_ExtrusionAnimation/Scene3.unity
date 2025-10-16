@@ -708,6 +708,7 @@ GameObject:
   - component: {fileID: 1379864730}
   - component: {fileID: 1379864728}
   - component: {fileID: 1379864731}
+  - component: {fileID: 1379864732}
   m_Layer: 0
   m_Name: FillHexa
   m_TagString: Untagged
@@ -932,6 +933,79 @@ MonoBehaviour:
   showTreePositions: 1
   debugColor: {r: 0, g: 1, b: 0, a: 1}
   regenerateOnStart: 1
+--- !u!114 &1379864732
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379864727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ffc61a2857f2dc748b0e79f95c8b781a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rockCount: 150
+  rockScale: 1
+  rockSpacing: 3
+  rockScaleVariation: 0.4
+  rockPrefabs:
+  - {fileID: 1771522038311888703, guid: be901be579c49874396e9d9d63eb4f9d, type: 3}
+  - {fileID: 3899062507018915402, guid: d29cdc5d14606364182447b22dcfb2a8, type: 3}
+  rockTypeWeights:
+  - 0.6
+  - 0.4
+  grassCount: 300
+  grassScale: 0.8
+  grassSpacing: 1.5
+  grassScaleVariation: 0.3
+  grassPrefabs:
+  - {fileID: 8841556497259447336, guid: 84fa23e756ffdb54bbb8972264b3ef0b, type: 3}
+  - {fileID: 2404992995010194662, guid: 73ed36a38f8c3a7478d264f8b5c1d53b, type: 3}
+  grassTypeWeights:
+  - 0.5
+  - 0.5
+  otherTreeCount: 100
+  otherTreeScale: 1.2
+  otherTreeSpacing: 4
+  otherTreeScaleVariation: 0.3
+  otherTreePrefabs:
+  - {fileID: 1048619731432920154, guid: 97ed7022e3bd74e448400a47b69bc3aa, type: 3}
+  - {fileID: 1571172706951862749, guid: 09223777bce8cc14ba25c71ad68401ba, type: 3}
+  - {fileID: 6683518766709287863, guid: 4479ebe4655d1b34b94531d06a774f19, type: 3}
+  otherTreeTypeWeights:
+  - 0.4
+  - 0.6
+  landThreshold: 0.3
+  oceanLevel: 0
+  rockPatchNoiseScale: 0.015
+  rockPatchThreshold: 0.2
+  minRocksPerPatch: 5
+  maxRocksPerPatch: 20
+  grassPatchNoiseScale: 0.025
+  grassPatchThreshold: 0.15
+  minGrassPerPatch: 10
+  maxGrassPerPatch: 30
+  otherTreePatchNoiseScale: 0.02
+  otherTreePatchThreshold: 0.18
+  minOtherTreesPerPatch: 6
+  maxOtherTreesPerPatch: 25
+  noiseIntensity: 2.5
+  noiseOctaves: 3
+  noiseLacunarity: 2
+  noisePersistence: 0.5
+  showPlacementStats: 1
+  forceDensePlacement: 0
+  maxAttemptsMultiplier: 20
+  showDebugInfo: 1
+  showPropPositions: 0
+  rockDebugColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  grassDebugColor: {r: 0, g: 1, b: 0, a: 1}
+  otherTreeDebugColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  regenerateOnStart: 1
+  generateRocks: 1
+  generateGrass: 1
+  generateOtherTrees: 1
 --- !u!1 &1559964992
 GameObject:
   m_ObjectHideFlags: 0
@@ -948,6 +1022,8 @@ GameObject:
   - component: {fileID: 1559964999}
   - component: {fileID: 1559965000}
   - component: {fileID: 1559965001}
+  - component: {fileID: 1559965002}
+  - component: {fileID: 1559965003}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1217,6 +1293,54 @@ MonoBehaviour:
   lockToSphereTop: 1
   manualRotationSpeed: 2
   rotationTransitionSpeed: 5
+--- !u!135 &1559965002
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1559964992}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!54 &1559965003
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1559964992}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &1652394923
 GameObject:
   m_ObjectHideFlags: 0
