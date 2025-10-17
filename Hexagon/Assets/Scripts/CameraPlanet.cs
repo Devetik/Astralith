@@ -64,8 +64,15 @@ public class CameraPlanet : MonoBehaviour
     [SerializeField] public float manualRotationSpeed = 2f; // Vitesse de rotation manuelle
     [SerializeField] public float rotationTransitionSpeed = 5f; // Vitesse de transition de la rotation
     
+    [Header("🌅 Regard vers l'Horizon")]
+    [SerializeField] public bool enableHorizonLook = true; // Activer le regard vers l'horizon
+    [SerializeField] public float horizonLookDistance = 2f; // Distance au-delà du point tangent pour regarder l'horizon
+    [SerializeField] public float horizonLookHeight = 0.5f; // Hauteur relative pour regarder vers l'horizon (0-1)
+    [SerializeField] public float horizonTransitionSpeed = 3f; // Vitesse de transition vers l'horizon
+    
     // Variables privées
-    private float planetaryArea = 0f; // Distance centre-surface de la planète
+    private float PlanetSize = 0f; // Distance centre-surface de la planète ciblée
+    private System.Collections.Generic.Dictionary<Transform, float> planetSizes = new System.Collections.Generic.Dictionary<Transform, float>(); // Taille de toutes les planètes
     private Camera cam;
     private Vector3 mousePositionOnClick;
     private float clickStartTime;
@@ -151,6 +158,7 @@ public class CameraPlanet : MonoBehaviour
         HandleZoom();
         HandleMovement();
         UpdateInnerSphere();
+        UpdateAllPlanetSizes();
     }
     
     void HandleInput()
@@ -311,9 +319,9 @@ public class CameraPlanet : MonoBehaviour
             {
                 // Ne pas forcer la rotation si le système de sphère intérieure est actif
                 if (!enableInnerSphere)
-                {
-                    Quaternion newTargetRotation = Quaternion.LookRotation(directionToTarget);
-                    transform.rotation = newTargetRotation;
+            {
+                Quaternion newTargetRotation = Quaternion.LookRotation(directionToTarget);
+                transform.rotation = newTargetRotation;
                 }
             }
             
@@ -383,7 +391,7 @@ public class CameraPlanet : MonoBehaviour
         if (zoomBuffer != 0f || zoomVelocity != 0f)
         {
             // Calculer la distance actuelle à la surface de la planète
-            float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - planetaryArea;
+            float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - PlanetSize;
             
             // Calculer la vitesse de zoom
             float zoomSpeed = CalculateZoomSpeed(currentDistance);
@@ -400,7 +408,7 @@ public class CameraPlanet : MonoBehaviour
             
             // Vérifier qu'on ne va pas trop près de la surface
             float newDistanceToCenter = Vector3.Distance(transform.position + zoomMovement, currentTarget.position);
-            float newDistanceToSurface = newDistanceToCenter - planetaryArea;
+            float newDistanceToSurface = newDistanceToCenter - PlanetSize;
             if (newDistanceToSurface >= contactBuffer)
             {
                 transform.position += zoomMovement;
@@ -425,7 +433,7 @@ public class CameraPlanet : MonoBehaviour
         if (Mathf.Abs(scroll) > 0.01f)
         {
             // Calculer la distance actuelle à la surface de la planète
-            float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - planetaryArea;
+            float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - PlanetSize;
             
             // Calculer la vitesse de zoom exponentielle
             float zoomSpeed = CalculateZoomSpeed(currentDistance);
@@ -436,7 +444,7 @@ public class CameraPlanet : MonoBehaviour
             
             // Vérifier qu'on ne va pas trop près de la surface
             float newDistanceToCenter = Vector3.Distance(transform.position + zoomMovement, currentTarget.position);
-            float newDistanceToSurface = newDistanceToCenter - planetaryArea;
+            float newDistanceToSurface = newDistanceToCenter - PlanetSize;
             if (newDistanceToSurface >= contactBuffer)
             {
                 transform.position += zoomMovement;
@@ -613,7 +621,7 @@ public class CameraPlanet : MonoBehaviour
     Quaternion CalculateRotation(float currentDistance)
     {
         // Calculer le facteur de transition (0 = très près, 1 = loin)
-        float t = Mathf.InverseLerp(0f, planetaryArea / 4f, currentDistance);
+        float t = Mathf.InverseLerp(0f, PlanetSize / 4f, currentDistance);
         
         // Orientation vers la planète (quand on est loin)
         Vector3 directionToPlanet = (currentTarget.position - transform.position).normalized;
@@ -644,9 +652,8 @@ public class CameraPlanet : MonoBehaviour
     
     float CalculateZoomSpeed(float currentDistance)
     {
-        float t = 1f -(Mathf.InverseLerp(planetaryArea / 2f, 0f, currentDistance));
+        float t = 1f -(Mathf.InverseLerp(PlanetSize / 2f, 0f, currentDistance));
         float ActualzoomSpeed = Mathf.Lerp(1f, 350f, t);
-        Debug.Log($"ZoomSpeed: {ActualzoomSpeed} / currentDistance:{currentDistance} / planetaryArea:{planetaryArea} t:{t}");
         return ActualzoomSpeed;
     }
     
@@ -655,7 +662,7 @@ public class CameraPlanet : MonoBehaviour
         if (!enableInnerSphere || currentTarget == null) return;
         
         // Calculer la distance actuelle à la surface de la planète
-        float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - planetaryArea;
+        float currentDistance = Vector3.Distance(transform.position, currentTarget.position) - PlanetSize;
         
         // Calculer le rayon de la sphère intérieure
         float targetSphereRadius = CalculateInnerSphereRadius(currentDistance);
@@ -686,7 +693,7 @@ public class CameraPlanet : MonoBehaviour
             float t = Mathf.InverseLerp(0f, sphereStartDistance, currentDistance);
             
             // Taille maximale de la sphère (pourcentage du rayon de la planète)
-            float maxSphereRadius = planetaryArea * sphereMaxSizePercent;
+            float maxSphereRadius = PlanetSize * sphereMaxSizePercent;
             
             // Interpoler entre 0 et la taille maximale
             return Mathf.Lerp(maxSphereRadius, 0f, t);
@@ -726,7 +733,27 @@ public class CameraPlanet : MonoBehaviour
             }
             
             // Le point cible est sur la sphère, perpendiculaire à la direction vers le centre
-            sphereTargetPoint = sphereCenter + projectedUp * currentSphereRadius;
+            Vector3 tangentPoint = sphereCenter + projectedUp * currentSphereRadius;
+            
+            // Appliquer le système de regard vers l'horizon si activé
+            if (enableHorizonLook)
+            {
+                // Calculer la direction vers l'horizon (plus haut que le point tangent)
+                Vector3 horizonDirection = (tangentPoint - sphereCenter).normalized;
+                
+                // Ajouter une hauteur relative pour regarder vers l'horizon
+                Vector3 horizonOffset = Vector3.up * horizonLookHeight * currentSphereRadius;
+                
+                // Calculer la distance au-delà du point tangent
+                float distanceBeyondTangent = horizonLookDistance * currentSphereRadius;
+                
+                // Le point cible final est au-delà du point tangent, vers l'horizon
+                sphereTargetPoint = tangentPoint + horizonDirection * distanceBeyondTangent + horizonOffset;
+            }
+            else
+            {
+                sphereTargetPoint = tangentPoint;
+            }
         }
         else
         {
@@ -816,7 +843,7 @@ public class CameraPlanet : MonoBehaviour
                 hasContactPoint = true;
                 
                 // Calculer la distance centre-surface pour PlanetaryArea
-                planetaryArea = Vector3.Distance(currentTarget.position, contactPoint);
+                PlanetSize = Vector3.Distance(currentTarget.position, contactPoint);
                 
                 return;
             }
@@ -833,12 +860,12 @@ public class CameraPlanet : MonoBehaviour
             hasContactPoint = true;
             
             // Utiliser le rayon configuré pour PlanetaryArea
-            planetaryArea = planetRadius;
+            PlanetSize = planetRadius;
         }
         else
         {
             hasContactPoint = false;
-            planetaryArea = 0f;
+            PlanetSize = 0f;
         }
     }
     
@@ -886,7 +913,7 @@ public class CameraPlanet : MonoBehaviour
         currentTarget = null;
         lastMovementTime = 0f;
         hasContactPoint = false;
-        planetaryArea = 0f;
+        PlanetSize = 0f;
         
         // Réinitialiser les variables de la sphère intérieure
         currentSphereRadius = 0f;
@@ -936,11 +963,42 @@ public class CameraPlanet : MonoBehaviour
         }
         
         // Dessiner la zone planétaire si activé et disponible
-        if (currentTarget != null && planetaryArea > 0)
+        if (currentTarget != null && PlanetSize > 0)
         {
             Gizmos.color = Color.green;
-            float sphereRadius = planetaryArea * PlanetAreaFactor; // 2 fois la distance centre-surface
+            float sphereRadius = PlanetSize * PlanetAreaFactor;
             Gizmos.DrawWireSphere(currentTarget.position, sphereRadius);
+            
+            // Ajouter des informations de debug
+            if (showDebugInfo)
+            {
+                // Dessiner une ligne du centre vers la surface
+                Vector3 surfacePoint = currentTarget.position + (transform.position - currentTarget.position).normalized * PlanetSize;
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawLine(currentTarget.position, surfacePoint);
+                
+                // Dessiner le point de surface
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireSphere(surfacePoint, 0.1f);
+            }
+        }
+        
+        // Dessiner la taille de toutes les planètes
+        if (showDebugInfo)
+        {
+            foreach (var kvp in planetSizes)
+            {
+                if (kvp.Key != null)
+                {
+                    // Dessiner la sphère de la planète
+                    Gizmos.color = Color.cyan;
+                    Gizmos.DrawWireSphere(kvp.Key.position, kvp.Value);
+                    
+                    // Dessiner la zone d'influence
+                    Gizmos.color = Color.magenta;
+                    Gizmos.DrawWireSphere(kvp.Key.position, kvp.Value * PlanetAreaFactor);
+                }
+            }
         }
         
         // Dessiner la sphère intérieure si activée
@@ -958,7 +1016,103 @@ public class CameraPlanet : MonoBehaviour
                 // Dessiner une ligne vers le point cible
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawLine(transform.position, sphereTargetPoint);
+                
+                // Dessiner le point tangent si le regard vers l'horizon est activé
+                if (enableHorizonLook)
+                {
+                    Vector3 cameraToCenter = (sphereCenter - transform.position).normalized;
+                    Vector3 cameraUp = transform.up;
+                    Vector3 projectedUp = Vector3.ProjectOnPlane(cameraUp, cameraToCenter).normalized;
+                    
+                    if (projectedUp.magnitude >= 0.1f)
+                    {
+                        Vector3 tangentPoint = sphereCenter + projectedUp * currentSphereRadius;
+                        
+                        // Dessiner le point tangent
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawWireSphere(tangentPoint, 0.05f);
+                        
+                        // Dessiner une ligne du point tangent vers le point d'horizon
+                        Gizmos.color = new Color(1f, 0.5f, 0f); // Orange
+                        Gizmos.DrawLine(tangentPoint, sphereTargetPoint);
+                    }
+                }
             }
         }
+    }
+    
+    void UpdateAllPlanetSizes()
+    {
+        // Chercher toutes les planètes dans la scène
+        string[] planetTags = { "Planet", "Moon", "Sun" };
+        
+        foreach (string tag in planetTags)
+        {
+            GameObject[] planets = GameObject.FindGameObjectsWithTag(tag);
+            foreach (GameObject planet in planets)
+            {
+                Transform planetTransform = planet.transform;
+                
+                // Si cette planète n'est pas encore dans le dictionnaire, l'ajouter
+                if (!planetSizes.ContainsKey(planetTransform))
+                {
+                    // Calculer la taille de la planète
+                    float planetSize = CalculatePlanetSize(planetTransform);
+                    planetSizes[planetTransform] = planetSize;
+                    
+                    if (showDebugInfo)
+                    {
+                        Debug.Log($"PlanetSize calculée pour {planet.name}: {planetSize}");
+                    }
+                }
+            }
+        }
+        
+        // Nettoyer les planètes qui n'existent plus
+        var keysToRemove = new System.Collections.Generic.List<Transform>();
+        foreach (var kvp in planetSizes)
+        {
+            if (kvp.Key == null)
+            {
+                keysToRemove.Add(kvp.Key);
+            }
+        }
+        
+        foreach (var key in keysToRemove)
+        {
+            planetSizes.Remove(key);
+        }
+    }
+    
+    float CalculatePlanetSize(Transform planet)
+    {
+        // Essayer de trouver un collider pour calculer la taille
+        Collider planetCollider = planet.GetComponent<Collider>();
+        if (planetCollider != null)
+        {
+            // Utiliser la taille du collider
+            Vector3 bounds = planetCollider.bounds.size;
+            return Mathf.Max(bounds.x, bounds.y, bounds.z) / 2f; // Rayon
+        }
+        
+        // Essayer de trouver un MeshRenderer pour calculer la taille
+        MeshRenderer meshRenderer = planet.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            Vector3 bounds = meshRenderer.bounds.size;
+            return Mathf.Max(bounds.x, bounds.y, bounds.z) / 2f; // Rayon
+        }
+        
+        // Fallback : utiliser le rayon configuré
+        return planetRadius;
+    }
+    
+    public float GetPlanetSize(Transform planet)
+    {
+        if (planetSizes.ContainsKey(planet))
+        {
+            return planetSizes[planet];
+        }
+        return planetRadius; // Fallback
     }
 }
