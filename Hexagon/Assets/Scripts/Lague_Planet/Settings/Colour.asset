@@ -4,7 +4,8 @@
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -13,22 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gradient:
     serializedVersion: 2
-    key0: {r: 0.10537558, g: 0.28996745, b: 0.6037736, a: 1}
-    key1: {r: 0.6411254, g: 0.6792453, b: 0.3556426, a: 1}
-    key2: {r: 0.43614092, g: 0.7169812, b: 0.07102172, a: 0}
-    key3: {r: 0.29747033, g: 0.3962264, b: 0.0990566, a: 0}
-    key4: {r: 0.5660378, g: 0.35174984, b: 0.16286935, a: 0}
-    key5: {r: 0.49056602, g: 0.31925604, b: 0.17817727, a: 0}
+    key0: {r: 0.092837244, g: 0.13841718, b: 0.83396226, a: 1}
+    key1: {r: 0.6970409, g: 0.7433963, b: 0.36328232, a: 1}
+    key2: {r: 0.4063728, g: 0.5973867, b: 0.217958, a: 0}
+    key3: {r: 0.11108474, g: 0.4490565, b: 0.07032391, a: 0}
+    key4: {r: 0.5924529, g: 0.34212345, b: 0.1196084, a: 0}
+    key5: {r: 1, g: 1, b: 1, a: 0}
     key6: {r: 1, g: 1, b: 1, a: 0}
-    key7: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 1, g: 1, b: 1, a: 0}
     ctime0: 0
-    ctime1: 2747
-    ctime2: 8633
-    ctime3: 22237
-    ctime4: 37673
-    ctime5: 57687
-    ctime6: 65535
-    ctime7: 0
+    ctime1: 1311
+    ctime2: 4857
+    ctime3: 20894
+    ctime4: 26445
+    ctime5: 32768
+    ctime6: 30146
+    ctime7: 65535
     atime0: 0
     atime1: 65535
     atime2: 0
@@ -38,6 +39,7 @@ MonoBehaviour:
     atime6: 0
     atime7: 0
     m_Mode: 0
-    m_NumColorKeys: 7
+    m_ColorSpace: 0
+    m_NumColorKeys: 6
     m_NumAlphaKeys: 2
-  planetMaterial: {fileID: 2100000, guid: d6570cc21b41742188eca71a4bb8d9e7, type: 2}
+  planetMaterial: {fileID: -876546973899608171, guid: 0618a03417855ff4c934a0c6ad364736, type: 3}
