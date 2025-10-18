@@ -2,9 +2,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Planet : MonoBehaviour {
+public class Planet : MonoBehaviour
+{
 
-    [Range(2,256)]
+    [Range(2, 256)]
     public int resolution = 10;
     public bool autoUpdate = true;
     public enum FaceRenderMask { All, Top, Bottom, Left, Right, Front, Back };
@@ -24,9 +25,9 @@ public class Planet : MonoBehaviour {
     [SerializeField, HideInInspector]
     MeshFilter[] meshFilters;
     TerrainFace[] terrainFaces;
-     
 
-	void Initialize()
+
+    void Initialize()
     {
         shapeGenerator.UpdateSettings(shapeSettings);
         colourGenerator.UpdateSettings(colourSettings);
@@ -99,5 +100,12 @@ public class Planet : MonoBehaviour {
     void GenerateColours()
     {
         colourGenerator.UpdateColours();
+        for (int i = 0; i < 6; i++)
+        {
+            if (meshFilters[i].gameObject.activeSelf)
+            {
+                terrainFaces[i].UpdateUVs(colourGenerator);
+            }
+        }
     }
 }
