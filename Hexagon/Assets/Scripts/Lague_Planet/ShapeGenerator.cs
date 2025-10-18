@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ShapeGenerator {
+public class ShapeGenerator
+{
 
     ShapeSettings settings;
     INoiseFilter[] noiseFilters;
@@ -41,7 +42,6 @@ public class ShapeGenerator {
                 elevation += noiseFilters[i].Evaluate(pointOnUnitSphere) * mask;
             }
         }
-
         elevationMinMax.AddValue(elevation);
         return elevation;
     }
@@ -53,4 +53,3 @@ public class ShapeGenerator {
         return elevation;
     }
 }
- 
