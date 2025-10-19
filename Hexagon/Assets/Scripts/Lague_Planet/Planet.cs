@@ -19,7 +19,11 @@ public class Planet : MonoBehaviour
     [Range(0, 3)]
     public int subdivisionLevel = 0;
     [Tooltip("0 = 6 faces, 1 = 24 faces, 2 = 96 faces, 3 = 384 faces")]
-    public bool adaptiveSubdivision = false;
+    
+    [Header("Texture Quality")]
+    [Range(64, 1024)]
+    public int textureResolution = 256;
+    [Tooltip("Résolution de la texture de couleurs (plus élevé = plus précis)")]
 
     public ShapeSettings shapeSettings;
     public ColourSettings colourSettings;
@@ -41,8 +45,15 @@ public class Planet : MonoBehaviour
     {
         shapeGenerator.UpdateSettings(shapeSettings);
         colourGenerator.UpdateSettings(colourSettings);
+        colourGenerator.SetTextureResolution(textureResolution);
 
         int numFaces = GetFaceCount();
+        
+        // Nettoyer les anciens mesh si le nombre de faces a changé
+        if (meshFilters != null && meshFilters.Length != numFaces)
+        {
+            CleanupOldMeshes();
+        }
         
         if (meshFilters == null || meshFilters.Length != numFaces)
         {
@@ -68,6 +79,28 @@ public class Planet : MonoBehaviour
             terrainFaces[i] = new TerrainFace(shapeGenerator, meshFilters[i].sharedMesh, resolution, directions[i], normalMode, subdivisionLevel, i);
             bool renderFace = faceRenderMask == FaceRenderMask.All || (int)faceRenderMask - 1 == (i / GetFacesPerDirection());
             meshFilters[i].gameObject.SetActive(renderFace);
+        }
+    }
+
+    void CleanupOldMeshes()
+    {
+        if (meshFilters != null)
+        {
+            for (int i = 0; i < meshFilters.Length; i++)
+            {
+                if (meshFilters[i] != null && meshFilters[i].gameObject != null)
+                {
+                    // Détruire le GameObject et son mesh
+                    if (Application.isPlaying)
+                    {
+                        Destroy(meshFilters[i].gameObject);
+                    }
+                    else
+                    {
+                        DestroyImmediate(meshFilters[i].gameObject);
+                    }
+                }
+            }
         }
     }
 

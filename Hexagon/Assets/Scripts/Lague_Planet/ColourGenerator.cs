@@ -7,7 +7,7 @@ public class ColourGenerator
 
     ColourSettings settings;
     Texture2D texture;
-    const int textureResolution = 50;
+    int textureResolution = 256; // Résolution dynamique et plus élevée
     INoiseFilter biomeNoiseFilter;
 
     public void UpdateSettings(ColourSettings settings)
@@ -16,8 +16,21 @@ public class ColourGenerator
         if (texture == null || texture.height != settings.biomeColourSettings.biomes.Length)
         {
             texture = new Texture2D(textureResolution*2, settings.biomeColourSettings.biomes.Length, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear; // Améliore la qualité des textures
+            texture.wrapMode = TextureWrapMode.Clamp;
         }
         biomeNoiseFilter = NoiseFilterFactory.CreateNoiseFilter(settings.biomeColourSettings.noise);
+    }
+
+    public void SetTextureResolution(int resolution)
+    {
+        textureResolution = Mathf.Clamp(resolution, 64, 1024);
+        if (texture != null)
+        {
+            texture = new Texture2D(textureResolution*2, settings.biomeColourSettings.biomes.Length, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+        }
     }
 
     public void UpdateElevation(MinMax elevationMinMax)
@@ -47,6 +60,14 @@ public class ColourGenerator
 
     public void UpdateColours()
     {
+        // Recréer la texture si nécessaire
+        if (texture == null || texture.width != textureResolution * 2 || texture.height != settings.biomeColourSettings.biomes.Length)
+        {
+            texture = new Texture2D(textureResolution * 2, settings.biomeColourSettings.biomes.Length, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+        }
+
         Color[] colours = new Color[texture.width * texture.height];
         int colourIndex = 0;
         
