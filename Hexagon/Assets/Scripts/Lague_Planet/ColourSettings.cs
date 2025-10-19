@@ -29,6 +29,10 @@ public class ColourSettings : ScriptableObject
             public float startHeight;
             [Range(0, 1)]
             public float tintPercent;
+            [Header("Override Settings")]
+            public bool overrideOtherBiomes = false;
+            [Tooltip("Si coché, ce biome passera par-dessus les autres biomes")]
+            public bool isOverrideLayer = false;
         }
     }
 
