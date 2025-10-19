@@ -10,6 +10,16 @@ public class Planet : MonoBehaviour
     public bool autoUpdate = true;
     public enum FaceRenderMask { All, Top, Bottom, Left, Right, Front, Back };
     public FaceRenderMask faceRenderMask;
+    
+    public enum NormalCalculationMode { Smooth, LowPoly };
+    [Header("Rendering Style")]
+    public NormalCalculationMode normalMode = NormalCalculationMode.Smooth;
+    
+    [Header("Hierarchical Subdivision")]
+    [Range(0, 3)]
+    public int subdivisionLevel = 0;
+    [Tooltip("0 = 6 faces, 1 = 24 faces, 2 = 96 faces, 3 = 384 faces")]
+    public bool adaptiveSubdivision = false;
 
     public ShapeSettings shapeSettings;
     public ColourSettings colourSettings;
@@ -32,19 +42,21 @@ public class Planet : MonoBehaviour
         shapeGenerator.UpdateSettings(shapeSettings);
         colourGenerator.UpdateSettings(colourSettings);
 
-        if (meshFilters == null || meshFilters.Length == 0)
+        int numFaces = GetFaceCount();
+        
+        if (meshFilters == null || meshFilters.Length != numFaces)
         {
-            meshFilters = new MeshFilter[6];
+            meshFilters = new MeshFilter[numFaces];
         }
-        terrainFaces = new TerrainFace[6];
+        terrainFaces = new TerrainFace[numFaces];
 
-        Vector3[] directions = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
+        Vector3[] directions = GetFaceDirections();
 
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < numFaces; i++)
         {
             if (meshFilters[i] == null)
             {
-                GameObject meshObj = new GameObject("mesh");
+                GameObject meshObj = new GameObject($"mesh_{i}");
                 meshObj.transform.parent = transform;
 
                 meshObj.AddComponent<MeshRenderer>();
@@ -53,10 +65,41 @@ public class Planet : MonoBehaviour
             }
             meshFilters[i].GetComponent<MeshRenderer>().sharedMaterial = colourSettings.planetMaterial;
 
-            terrainFaces[i] = new TerrainFace(shapeGenerator, meshFilters[i].sharedMesh, resolution, directions[i]);
-            bool renderFace = faceRenderMask == FaceRenderMask.All || (int)faceRenderMask - 1 == i;
+            terrainFaces[i] = new TerrainFace(shapeGenerator, meshFilters[i].sharedMesh, resolution, directions[i], normalMode, subdivisionLevel, i);
+            bool renderFace = faceRenderMask == FaceRenderMask.All || (int)faceRenderMask - 1 == (i / GetFacesPerDirection());
             meshFilters[i].gameObject.SetActive(renderFace);
         }
+    }
+
+    int GetFaceCount()
+    {
+        int facesPerDirection = GetFacesPerDirection();
+        return 6 * facesPerDirection;
+    }
+
+    int GetFacesPerDirection()
+    {
+        return (int)Mathf.Pow(4, subdivisionLevel);
+    }
+
+    Vector3[] GetFaceDirections()
+    {
+        int facesPerDirection = GetFacesPerDirection();
+        Vector3[] directions = new Vector3[6 * facesPerDirection];
+        Vector3[] baseDirections = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
+        
+        for (int face = 0; face < 6; face++)
+        {
+            Vector3 baseDir = baseDirections[face];
+            
+            for (int sub = 0; sub < facesPerDirection; sub++)
+            {
+                int index = face * facesPerDirection + sub;
+                directions[index] = baseDir;
+            }
+        }
+        
+        return directions;
     }
 
     public void GeneratePlanet()
@@ -86,7 +129,9 @@ public class Planet : MonoBehaviour
 
     void GenerateMesh()
     {
-        for (int i = 0; i < 6; i++)
+        int numFaces = GetFaceCount();
+        
+        for (int i = 0; i < numFaces; i++)
         {
             if (meshFilters[i].gameObject.activeSelf)
             {
@@ -100,7 +145,10 @@ public class Planet : MonoBehaviour
     void GenerateColours()
     {
         colourGenerator.UpdateColours();
-        for (int i = 0; i < 6; i++)
+        
+        int numFaces = GetFaceCount();
+        
+        for (int i = 0; i < numFaces; i++)
         {
             if (meshFilters[i].gameObject.activeSelf)
             {
