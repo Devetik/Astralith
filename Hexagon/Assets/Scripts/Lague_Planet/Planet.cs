@@ -30,7 +30,7 @@ public class Planet : MonoBehaviour
     
     [Header("Collision Settings")]
     public bool generateColliders = true;
-    [Tooltip("Génère des MeshColliders pour les PNJ et raycast")]
+    public Transform MainCamera;
 
     public ShapeSettings shapeSettings;
     public ColourSettings colourSettings;
@@ -306,6 +306,54 @@ public class Planet : MonoBehaviour
                 // Forcer la mise à jour du collider
                 meshCollider.sharedMesh = null;
                 meshCollider.sharedMesh = meshFilters[faceIndex].sharedMesh;
+            }
+        }
+    }
+
+    void OnDrawGizmos()
+    {
+        if (lodSettings != null && lodSettings.debugLOD)
+        {
+            // Obtenir la caméra
+            Transform cam = MainCamera;
+            if (cam == null && Camera.main != null)
+            {
+                cam = Camera.main.transform;
+            }
+            
+            if (cam != null)
+            {
+                // Dessiner une ligne du centre de la planète vers la caméra
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawLine(transform.position, cam.position);
+                
+                // Trouver le point de contact réel avec le mesh
+                Vector3 directionToCamera = (cam.position - transform.position).normalized;
+                RaycastHit hit;
+                
+                // Raycast depuis la caméra vers le centre de la planète
+                if (Physics.Raycast(cam.position, -directionToCamera, out hit))
+                {
+                    // Point de contact réel avec le mesh
+                    Vector3 contactPoint = hit.point;
+                    
+                    // Dessiner une sphère de 0.5 unités au point de contact réel
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawSphere(contactPoint, 0.5f);
+                    
+                    // Dessiner la normale du mesh au point de contact
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawLine(contactPoint, contactPoint + hit.normal * 2f);
+                }
+                else
+                {
+                    // Fallback : utiliser le rayon de la sphère si pas de hit
+                    float planetRadius = shapeGenerator != null ? shapeGenerator.GetScaledElevation(0) : 1f;
+                    Vector3 contactPoint = transform.position + directionToCamera * planetRadius;
+                    
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawSphere(contactPoint, 0.5f);
+                }
             }
         }
     }

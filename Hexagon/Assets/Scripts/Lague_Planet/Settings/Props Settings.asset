@@ -12,5 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee4186fc764b3b14fbbdc3596d995071, type: 3}
   m_Name: Props Settings
   m_EditorClassIdentifier: 
-  propsSettingsData:
-    enableProps: 0
+  enablePropsFAKE: 0
