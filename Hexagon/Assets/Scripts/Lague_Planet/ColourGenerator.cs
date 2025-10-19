@@ -20,6 +20,9 @@ public class ColourGenerator
             texture.wrapMode = TextureWrapMode.Clamp;
         }
         biomeNoiseFilter = NoiseFilterFactory.CreateNoiseFilter(settings.biomeColourSettings.noise);
+        
+        // Mettre à jour les couleurs automatiquement
+        UpdateColours();
     }
 
     public void SetTextureResolution(int resolution)

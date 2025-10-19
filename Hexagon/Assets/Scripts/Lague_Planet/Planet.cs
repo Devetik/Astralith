@@ -1,6 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class Planet : MonoBehaviour
 {
@@ -24,14 +27,24 @@ public class Planet : MonoBehaviour
     [Range(64, 1024)]
     public int textureResolution = 256;
     [Tooltip("Résolution de la texture de couleurs (plus élevé = plus précis)")]
+    
+    [Header("Collision Settings")]
+    public bool generateColliders = true;
+    [Tooltip("Génère des MeshColliders pour les PNJ et raycast")]
 
     public ShapeSettings shapeSettings;
     public ColourSettings colourSettings;
+    public LODSettings lodSettings;
+    public PropsSettings propsSettings;
 
     [HideInInspector]
     public bool shapeSettingsFoldout;
     [HideInInspector]
     public bool colourSettingsFoldout;
+    [HideInInspector]
+    public bool lodSettingsFoldout;
+    [HideInInspector]
+    public bool propsSettingsFoldout;
 
     ShapeGenerator shapeGenerator = new ShapeGenerator();
     ColourGenerator colourGenerator = new ColourGenerator();
@@ -40,6 +53,64 @@ public class Planet : MonoBehaviour
     MeshFilter[] meshFilters;
     TerrainFace[] terrainFaces;
 
+    void Start()
+    {
+        if (autoUpdate)
+        {
+            GeneratePlanet();
+        }
+    }
+
+    void OnValidate()
+    {
+        if (autoUpdate)
+        {
+            // Délai pour éviter les appels multiples pendant l'édition
+            if (Application.isPlaying)
+            {
+                GeneratePlanet();
+            }
+            else
+            {
+                // En Edit mode, utiliser un délai pour éviter les appels répétés
+#if UNITY_EDITOR
+                EditorApplication.delayCall += () => {
+                    if (this != null && autoUpdate)
+                    {
+                        GeneratePlanet();
+                    }
+                };
+#endif
+            }
+        }
+    }
+
+#if UNITY_EDITOR
+    void OnEnable()
+    {
+        // Se déclenche quand on entre/sort du Play mode
+        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+    }
+
+    void OnDisable()
+    {
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+    }
+
+    void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredEditMode && autoUpdate)
+        {
+            // Régénérer la planète quand on revient en Edit mode
+            EditorApplication.delayCall += () => {
+                if (this != null && autoUpdate)
+                {
+                    GeneratePlanet();
+                }
+            };
+        }
+    }
+#endif
 
     void Initialize()
     {
@@ -73,6 +144,13 @@ public class Planet : MonoBehaviour
                 meshObj.AddComponent<MeshRenderer>();
                 meshFilters[i] = meshObj.AddComponent<MeshFilter>();
                 meshFilters[i].sharedMesh = new Mesh();
+                
+                // Ajouter MeshCollider si demandé
+                if (generateColliders)
+                {
+                    MeshCollider meshCollider = meshObj.AddComponent<MeshCollider>();
+                    meshCollider.sharedMesh = meshFilters[i].sharedMesh;
+                }
             }
             meshFilters[i].GetComponent<MeshRenderer>().sharedMaterial = colourSettings.planetMaterial;
 
@@ -160,6 +238,28 @@ public class Planet : MonoBehaviour
         }
     }
 
+    public void OnPropsSettingsUpdated()
+    {
+        if (autoUpdate)
+        {
+            // Pour l'instant, pas d'implémentation
+            // Sera utilisé pour la génération de props
+        }
+    }
+    public void OnlodSettingsUpdated()
+    {
+        if (autoUpdate)
+        {
+            Initialize();
+        }
+    }
+
+    [ContextMenu("Force Regenerate Planet")]
+    public void ForceRegeneratePlanet()
+    {
+        GeneratePlanet();
+    }
+
     void GenerateMesh()
     {
         int numFaces = GetFaceCount();
@@ -169,6 +269,12 @@ public class Planet : MonoBehaviour
             if (meshFilters[i].gameObject.activeSelf)
             {
                 terrainFaces[i].ConstructMesh();
+                
+                // Mettre à jour le collider si nécessaire
+                if (generateColliders)
+                {
+                    UpdateMeshCollider(i);
+                }
             }
         }
 
@@ -186,6 +292,20 @@ public class Planet : MonoBehaviour
             if (meshFilters[i].gameObject.activeSelf)
             {
                 terrainFaces[i].UpdateUVs(colourGenerator);
+            }
+        }
+    }
+
+    void UpdateMeshCollider(int faceIndex)
+    {
+        if (meshFilters[faceIndex] != null)
+        {
+            MeshCollider meshCollider = meshFilters[faceIndex].GetComponent<MeshCollider>();
+            if (meshCollider != null)
+            {
+                // Forcer la mise à jour du collider
+                meshCollider.sharedMesh = null;
+                meshCollider.sharedMesh = meshFilters[faceIndex].sharedMesh;
             }
         }
     }

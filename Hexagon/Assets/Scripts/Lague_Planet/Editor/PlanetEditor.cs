@@ -9,6 +9,8 @@ public class PlanetEditor : Editor {
     Planet planet;
     Editor shapeEditor;
     Editor colourEditor;
+    Editor lodSettingsEditor;
+    Editor propsSettingsEditor;
 
 	public override void OnInspectorGUI()
 	{
@@ -28,6 +30,8 @@ public class PlanetEditor : Editor {
 
         DrawSettingsEditor(planet.shapeSettings, planet.OnShapeSettingsUpdated, ref planet.shapeSettingsFoldout, ref shapeEditor);
         DrawSettingsEditor(planet.colourSettings, planet.OnColourSettingsUpdated, ref planet.colourSettingsFoldout, ref colourEditor);
+        DrawSettingsEditor(planet.lodSettings, planet.OnlodSettingsUpdated, ref planet.lodSettingsFoldout, ref lodSettingsEditor);
+        DrawSettingsEditor(planet.propsSettings, planet.OnPropsSettingsUpdated, ref planet.propsSettingsFoldout, ref propsSettingsEditor);
 	}
 
     void DrawSettingsEditor(Object settings, System.Action onSettingsUpdated, ref bool foldout, ref Editor editor)
