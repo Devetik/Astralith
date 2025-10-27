@@ -1,0 +1,1 @@
+C:\Dev\Astralith\Astralith\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\build\intermediates\cxx\Debug\5g56he34\obj\arm64-v8a
