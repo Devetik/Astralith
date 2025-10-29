@@ -11,8 +11,11 @@ namespace Astralith.PlanetCam
         [SerializeField] Transform CameraTarget;
         [SerializeField] CinemachineOrbitalFollow OrbitalFollow;
         [SerializeField] CinemachineCamera CinemachineCamera;
+        [SerializeField] CinemachineRotationComposer RotationComposer;
 
-        [SerializeField] float ZoomSpeed = 0.5f;
+        [SerializeField] float ZoomSpeed = 0.01f;
+        [SerializeField] float ZoomSmoothing = 5f;
+        float CurrentZoomSpeed = 0f;
         
         [Header("🌍 Drag Organique")]
         [SerializeField] float dragSensitivity = 1f; // Sensibilité de base du drag
@@ -24,8 +27,8 @@ namespace Astralith.PlanetCam
         [SerializeField] bool useLookAtOffset = false; // Activer l'offset du point de regard
         
         [Header("🌍 Rayon d'Orbite")]
-        [Range(0f, 1000f)]
-        [SerializeField] float orbitRadius = 400f; // Rayon de l'orbite (0-1000)
+        [Range(0f, 5f)]
+        [SerializeField] float orbitRadius = 5f; // Rayon de l'orbite (0-1000)
         
         // Variables pour l'offset
         private Transform lookAtOffsetTransform;
@@ -35,11 +38,20 @@ namespace Astralith.PlanetCam
         bool middleClickInput = false;
         Vector2 scrollInput;
         Vector2 lookInput;
+        [SerializeField] Vector3 lookTest = Vector3.zero;
         
         // Variables pour le drag organique
         private Vector2 lastMousePosition;
         private bool isDragging = false;
 
+        public float ZoomLevel
+        {
+            get
+            {
+                InputAxis axis = OrbitalFollow.RadialAxis;
+                return Mathf.InverseLerp(axis.Range.x, axis.Range.y, axis.Value);
+            }
+        }
 
         void OnMiddleClick(InputValue value)
         {
@@ -71,11 +83,9 @@ namespace Astralith.PlanetCam
         void LateUpdate()
         {
             float deltaTime = Time.unscaledDeltaTime;
-
             UpdateOrganicDrag(deltaTime);
             UpdateZoom(deltaTime);
-            UpdateLookAtOffset();
-            UpdateOrbitRadius();
+            CalculatePlanetSurfaceDistance();
         }
 
         void UpdateOrganicDrag(float deltaTime)
@@ -119,54 +129,61 @@ namespace Astralith.PlanetCam
 
         void UpdateZoom(float deltaTime)
         {
-            if (Mathf.Abs(scrollInput.y) > 0.01f)
+            InputAxis axis = OrbitalFollow.RadialAxis;
+
+            float targetZoomSpeed = 0f;
+
+            if(Mathf.Abs(scrollInput.y) > 0.01f)
             {
-                InputAxis axis = OrbitalFollow.RadialAxis;
-                axis.Value -= scrollInput.y * ZoomSpeed;
-                axis.Value = Mathf.Clamp(axis.Value, axis.Range.x, axis.Range.y);
-                OrbitalFollow.RadialAxis = axis;
+                targetZoomSpeed = ZoomSpeed * scrollInput.y;
             }
+            float normalizedZoomSpeed = Mathf.InverseLerp(0f, 0.25f, ZoomLevel);
+            CurrentZoomSpeed = Mathf.Lerp(CurrentZoomSpeed*normalizedZoomSpeed, targetZoomSpeed, ZoomSmoothing * deltaTime);
+
+            axis.Value -= CurrentZoomSpeed;
+            axis.Value = Mathf.Clamp(axis.Value, axis.Range.x, axis.Range.y);
+
+            OrbitalFollow.RadialAxis = axis;
+
+            // Normaliser ZoomLevel entre 0.25 et 0 pour la rotation
+            float normalizedZoom = Mathf.InverseLerp(0f, 0.25f, ZoomLevel);
+            RotationComposer.Composition.ScreenPosition.y = Mathf.Lerp(1.2f, 0f, normalizedZoom);
         }
-        
-        void UpdateLookAtOffset()
+               
+        void CalculatePlanetSurfaceDistance()
         {
-            if (!useLookAtOffset || CinemachineCamera == null || CameraTarget == null) 
-            {
-                // Si l'offset est désactivé, nettoyer
-                if (lookAtOffsetInitialized && lookAtOffsetTransform != null)
-                {
-                    CinemachineCamera.LookAt = CameraTarget; // Retourner au target original
-                    DestroyImmediate(lookAtOffsetTransform.gameObject);
-                    lookAtOffsetTransform = null;
-                    lookAtOffsetInitialized = false;
-                }
-                return;
-            }
+            if (CameraTarget == null || CinemachineCamera == null || ZoomLevel > 0.25f) return;
             
-            // Créer l'objet LookAt une seule fois
-            if (!lookAtOffsetInitialized)
-            {
-                GameObject lookAtObject = new GameObject("LookAtOffset");
-                lookAtOffsetTransform = lookAtObject.transform;
-                CinemachineCamera.LookAt = lookAtOffsetTransform;
-                lookAtOffsetInitialized = true;
-                Debug.Log("LookAtOffset créé");
-            }
+            // Obtenir la position de la caméra
+            Vector3 cameraPosition = CinemachineCamera.transform.position;
             
-            // Mettre à jour la position du point de regard
-            if (lookAtOffsetTransform != null)
-            {
-                Vector3 lookAtPosition = CameraTarget.position + lookAtOffset;
-                lookAtOffsetTransform.position = lookAtPosition;
-            }
-        }
-        
-        void UpdateOrbitRadius()
-        {
-            if (OrbitalFollow == null) return;
+            // Calculer la direction depuis la caméra vers le centre de la planète
+            Vector3 directionToPlanet = (CameraTarget.position - cameraPosition).normalized;
             
-            // Mettre à jour directement la propriété Radius de CinemachineOrbitalFollow
-            OrbitalFollow.Radius = orbitRadius;
+            // Effectuer le raycast depuis la caméra vers la planète
+            RaycastHit hit;
+            float maxDistance = Vector3.Distance(cameraPosition, CameraTarget.position);
+            
+            if (Physics.Raycast(cameraPosition, directionToPlanet, out hit, maxDistance))
+            {
+                // Calculer la distance depuis le centre de la planète jusqu'au point d'impact sur la surface
+                float distanceFromCenterToSurface = Vector3.Distance(CameraTarget.position, hit.point);
+                OrbitalFollow.Radius = distanceFromCenterToSurface + orbitRadius;
+                
+                //Debug.Log($"Distance centre-planète → surface: {distanceFromCenterToSurface:F2} unités");
+                //Debug.Log($"Objet touché: {hit.collider.name}");
+                
+                // Dessiner le raycast pour debug visuel
+                //Debug.DrawRay(cameraPosition, directionToPlanet * Vector3.Distance(cameraPosition, hit.point), Color.red, 0.1f);
+                //Debug.DrawRay(CameraTarget.position, (hit.point - CameraTarget.position), Color.yellow, 0.1f);
+            }
+            else
+            {
+                Debug.Log("Aucune surface de planète détectée depuis la caméra");
+                
+                // Dessiner le raycast complet si aucun objet n'est touché
+                Debug.DrawRay(cameraPosition, directionToPlanet * maxDistance, Color.green, 0.1f);
+            }
         }
             
     }
